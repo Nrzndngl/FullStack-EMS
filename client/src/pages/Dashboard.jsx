@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react"
-import { dummyEmployeeDashboardData } from "../assets/assets"
+import { dummyAdminDashboardData, dummyEmployeeDashboardData } from "../assets/assets"
 import Loading from "../components/Loading"
 import EmployeeDashboard from "../components/EmployeeDashboard"
+import AdminDashboard from "../components/AdminDashboard"
 
 const Dashboard = () => {
   const [data, setData] = useState(null)
@@ -22,18 +23,11 @@ const Dashboard = () => {
     </p>
 
   if (data.role === "ADMIN") {
-    return <div>Admin Dashboard</div>
+    return <AdminDashboard data={data} />
   }
   else {
-    return <EmployeeDashboard />
+    return <EmployeeDashboard data={data} />
   }
-
-
-  return (
-    <div>
-      <h1>Dashboard</h1>
-    </div>
-  )
 }
 
 export default Dashboard
