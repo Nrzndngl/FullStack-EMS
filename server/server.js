@@ -7,6 +7,7 @@ import authRouter from "./routes/authRoutes.js";
 import employeeRouter from "./routes/employeeRoutes.js";
 import profileRouter from "./routes/profileRoutes.js";
 import attendanceRouter from "./routes/attendanceRoutes.js";
+import leaveRouter from "./routes/leaveRoutes.js";
 
 
 const app = express()
@@ -22,7 +23,9 @@ app.get("/", (req, res) => res.send("Server is running"));
 app.use("/api/auth", authRouter);
 app.use("/api/employees", employeeRouter);
 app.use("/api/profile", profileRouter);
-app.use("/api/attendance", attendanceRouter)
+app.use("/api/attendance", attendanceRouter);
+app.use("/api/leaves", leaveRouter);
+
 
 await connectDB();
 
