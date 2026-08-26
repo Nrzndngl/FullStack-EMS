@@ -112,3 +112,4 @@ export const updateLeaveStatus = async (req, res) => {
 
     }
 }
+
