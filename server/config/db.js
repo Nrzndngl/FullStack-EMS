@@ -1,5 +1,8 @@
 import mongoose from "mongoose";
+import dns from "node:dns";
 
+// Set DNS servers to Cloudflare and Google to resolve MongoDB SRV records properly
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 const connectDB = async () => {
     try {
@@ -11,3 +14,4 @@ const connectDB = async () => {
 }
 
 export default connectDB;
+
