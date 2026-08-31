@@ -57,7 +57,7 @@ const Leave = () => {
             ? "Review, approve and manage all employee leave applications"
             : "Track your leave balance and apply for time off"
         }
-        actions={
+        action={
           !isAdmin && !isDeleted && (
             <Button onClick={() => setShowModal(true)}>
               <Plus className="w-4 h-4" />
