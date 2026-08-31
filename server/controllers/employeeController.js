@@ -16,6 +16,7 @@ export const getEmployees = async (req, res) => {
 
         const result = employees.map((emp) => ({
             ...emp,
+            id: emp._id.toString(),
             user: emp.userId ? { email: emp.userId.email, role: emp.userId.role } : null
 
         }))
@@ -43,7 +44,7 @@ export const createEmployee = async (req, res) => {
             role: role || "EMPLOYEE"
         })
 
-        constemployee = await Employee.create({
+        const employee = await Employee.create({
             userId: user._id,
             firstName,
             lastName,
@@ -54,7 +55,7 @@ export const createEmployee = async (req, res) => {
             basicSalary: Number(basicSalary) || 0,
             allowances: Number(allowances) || 0,
             deductions: Number(deductions) || 0,
-            joinDate: new Date(joinDate),
+            joinDate: joinDate ? new Date(joinDate) : new Date(),
             bio: bio || ""
         })
         res.status(201).json({ success: true, employee })
@@ -101,8 +102,9 @@ export const updateEmployee = async (req, res) => {
 
         await User.findByIdAndUpdate(employee.userId, userUpdate)
 
+        const updated = await Employee.findById(id).lean();
 
-        return res.json({ success: true, employee })
+        return res.json({ success: true, employee: { ...updated, id: updated._id.toString() } })
 
     } catch (error) {
         if (error.code === 11000) {
@@ -128,6 +130,6 @@ export const deleteEmployee = async (req, res) => {
         return res.json({ success: true })
 
     } catch (error) {
-        return res.status(500).json({ error: "IFailed to delete employee" })
+        return res.status(500).json({ error: "Failed to delete employee" })
     }
 }

@@ -35,7 +35,7 @@ export const createLeave = async (req, res) => {
 
         if (new Date(endDate) < new Date(startDate)) {
             return res.status(400).json({
-                error: "End Date cannot be befor start date"
+                error: "End Date cannot be before start date"
             });
         }
 
@@ -72,17 +72,17 @@ export const getLeaves = async (req, res) => {
             const leaves = await LeaveApplication.find(where).populate("employeeId").sort({ startDate: -1 });
 
             const data = leaves.map((l) => {
-                const obj = length.toObject();
+                const obj = l.toObject();
                 return {
                     ...obj,
                     id: obj._id.toString(),
-                    employeeId: obj.employeeId._id.toString(),
+                    employeeId: obj.employeeId?._id?.toString(),
                     employee: obj.employeeId,
                 }
             })
             return res.json({ data: data });
         } else {
-            const employee = await Employee.findone({
+            const employee = await Employee.findOne({
                 userId: session.userId,
             }).lean();
             if (!employee) return res.status(404).json({

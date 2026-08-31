@@ -19,23 +19,20 @@ const EmployeeForm = ({ initialData, onSucess, onCancel }) => {
             if (!pwd) {
                 formData.delete("password")
             }
-
-            try {
-                const url = isEditMode ? `/employees/${initialData.id}` : "/employees";
-                const method = isEditMode ? "put" : "post";
-                await api[method](url, formData);
-                onSucess ? onSucess() : navigate("/employees");
-
-            } catch (error) {
-                toast.error(error.response?.data?.error || error.message);
-
-            } finally {
-                setLoading(false);
-            }
-
-
         }
 
+        try {
+            const url = isEditMode ? `/employees/${initialData.id}` : "/employees";
+            const method = isEditMode ? "put" : "post";
+            await api[method](url, formData);
+            onSucess ? onSucess() : navigate("/employees");
+
+        } catch (error) {
+            toast.error(error.response?.data?.error || error.message);
+
+        } finally {
+            setLoading(false);
+        }
     }
     return (
         <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl animate-fade-in">
@@ -57,7 +54,7 @@ const EmployeeForm = ({ initialData, onSucess, onCancel }) => {
                         <label className="block mb-2 ">
                             Last Name
                         </label>
-                        <input name="firstName" required defaultValue={initialData?.lastName} />
+                        <input name="lastName" required defaultValue={initialData?.lastName} />
                     </div>
                     <div>
                         <label className="block mb-2 ">
@@ -150,7 +147,7 @@ const EmployeeForm = ({ initialData, onSucess, onCancel }) => {
                         <label className="block mb-2 ">
                             Work Email
                         </label>
-                        <input type="email" name="workEmail" required defaultValue={initialData?.email} />
+                        <input type="email" name="email" required defaultValue={initialData?.email} />
                     </div>
                     {
                         !isEditMode && (

@@ -53,6 +53,9 @@ export const changePassword = async (req, res) => {
         if (!currentPassword || !newPassword) {
             return res.status(400).json({ error: "Current password and new password are required" });
         }
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: "New password must be at least 8 characters long" });
+        }
         const user = await User.findById(session.userId)
         if (!user) return res.status(404).json({ error: "User not found" })
 

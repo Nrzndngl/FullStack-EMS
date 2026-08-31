@@ -18,10 +18,20 @@ import { inngest, functions } from "./inngest/index.js"
 const app = express()
 const PORT = process.env.PORT || 4000;
 
+const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000").split(",").map((s) => s.trim());
+
 //Middleware
-app.use(cors());
+app.use(cors({
+    origin(origin, callback) {
+        // Allow requests with no origin (e.g. mobile apps, curl) and configured origins
+        if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true,
+}));
 app.use(express.json());
-app.use(multer().none())
+// Parse multipart/form-data (form-driven endpoints send FormData; JSON passes through untouched)
+app.use(multer().none());
 
 //Routes
 app.get("/", (req, res) => res.send("Server is running"));
@@ -36,7 +46,19 @@ app.use("/api/dashboard", dashboardRouter);
 // Set up the "/api/inngest" (recommended) routes with the serve handler
 app.use("/api/inngest", serve({ client: inngest, functions }));
 
+// 404 handler
+app.use((req, res) => {
+    res.status(404).json({ error: "Not found" });
+});
 
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error("Unhandled error:", err);
+    if (err.message === "Not allowed by CORS") {
+        return res.status(403).json({ error: "Not allowed by CORS" });
+    }
+    res.status(err.status || 500).json({ error: err.message || "Internal server error" });
+});
 
 await connectDB();
 

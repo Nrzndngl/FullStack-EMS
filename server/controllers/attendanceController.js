@@ -20,12 +20,13 @@ export const clockInOut = async (req, res) => {
         })
         const now = new Date();
 
-        if (existing) {
-            const isLate = now.getHours() >= 9 && now.getMinutes() > 0;
+        // No record yet -> CHECK IN
+        if (!existing) {
+            const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0);
             const attendance = await Attendance.create({
                 employeeId: employee._id,
                 date: today,
-                checkIn: nodemon,
+                checkIn: now,
                 status: isLate ? "LATE" : "PRESENT"
             });
 
@@ -37,12 +38,12 @@ export const clockInOut = async (req, res) => {
                 },
             })
 
-
-
             return res.json({ success: true, type: "CHECK_IN", data: attendance })
         }
-        else if (!existing.checkOut) {
-            const checkIntime = new Date(existing.checkIn).getTime()
+
+        // Record exists but no check-out -> CHECK OUT
+        if (!existing.checkOut) {
+            const checkInTime = new Date(existing.checkIn).getTime()
             const diffMs = now.getTime() - checkInTime;
             const diffHours = diffMs / (1000 * 60 * 60)
 
@@ -62,22 +63,21 @@ export const clockInOut = async (req, res) => {
 
             await existing.save();
             return res.json({ success: true, type: "CHECK_OUT", data: existing })
-        } else {
-            return res.json({ success: true, type: "Already Checked Out", data: existing })
         }
+
+        return res.json({ success: true, type: "Already Checked Out", data: existing })
     } catch (error) {
         console.error("Clock in/out error:", error);
         return res.status(500).json({ error: "Failed to clock in/out" })
     }
 }
 
-//GET ATTANDANCE
+//GET ATTENDANCE
 export const getAttendance = async (req, res) => {
     try {
         const session = req.session;
-        const employee = await Employee.findone({
-            userId: session.
-                userId
+        const employee = await Employee.findOne({
+            userId: session.userId
         })
         if (!employee) return res.status(404).json({
             error:
@@ -86,11 +86,11 @@ export const getAttendance = async (req, res) => {
 
         const limit = parseInt(req.query.limit || 30);
         const history = await Attendance.find({
-            employeeId: employee.id
+            employeeId: employee._id
         }).sort({ date: -1 }).limit(limit);
         return res.json({
             data: history,
-            employee: { isDeleted: employeeRouter.isDeleted }
+            employee: { isDeleted: employee.isDeleted }
         })
 
     } catch (error) {

@@ -38,7 +38,7 @@ export const getPayslips = async (req, res) => {
             const payslips = await Payslip.find().populate("employeeId").
                 sort({ createdAt: -1 });
             const data = payslips.map((p) => {
-                const obj = p.to0bject();
+                const obj = p.toObject();
                 return {
                     ...obj,
                     id: obj._id.toString(),
@@ -64,9 +64,20 @@ export const getPayslips = async (req, res) => {
 // GET SINGLE PAYSLIP BY ID
 export const getPayslipById = async (req, res) => {
     try {
+        const session = req.session;
         const payslip = await Payslip.findById(req.params.id).populate("employeeId").lean();
 
         if (!payslip) return res.status(404).json({ error: "Payslip not found" });
+
+        // ADMINS can view any payslip; EMPLOYEES can only view their own
+        if (session.role !== "ADMIN") {
+            const employee = await Employee.findOne({ userId: session.userId }).lean();
+            const employeeId = employee?._id?.toString();
+            const ownerId = payslip.employeeId?._id?.toString();
+            if (!employeeId || ownerId !== employeeId) {
+                return res.status(403).json({ error: "Not authorized to view this payslip" });
+            }
+        }
 
         const result = {
             ...payslip,
@@ -74,7 +85,7 @@ export const getPayslipById = async (req, res) => {
             employee: payslip.employeeId,
         };
 
-        return res.json({ result });
+        return res.json(result);
     } catch (error) {
         return res.status(500).json({ error: "Failed to fetch payslip" })
     }

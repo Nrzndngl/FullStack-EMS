@@ -82,9 +82,9 @@ const Employees = () => {
           ) : (
             filtered.map((emp) => (
               <EmployeeCard
-                key={emp.id}
+                key={emp._id || emp.id}
                 employee={emp}
-                onDelete={() => { fetchEmployees }}
+                onDelete={fetchEmployees}
                 onEdit={(e) => setEditEmployee(e)}
               />
             ))
