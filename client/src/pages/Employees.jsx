@@ -1,162 +1,158 @@
-import { useCallback, useEffect, useState } from "react"
-import { dummyEmployeeData, DEPARTMENTS } from "../assets/assets"
-import { Plus, Search, X } from "lucide-react"
-import EmployeeCard from "../components/EmployeeCard"
-import EmployeeForm from "../components/EmployeeForm"
-import api from "../api/axios"
+import { useCallback, useEffect, useState } from "react";
+import { DEPARTMENTS } from "../assets/assets";
+import { Plus, Search, Users } from "lucide-react";
+import EmployeeCard from "../components/EmployeeCard";
+import EmployeeForm from "../components/EmployeeForm";
+import Modal from "../components/ui/Modal";
+import EmptyState from "../components/ui/EmptyState";
+import PageHeader from "../components/ui/PageHeader";
+import api from "../api/axios";
 
 const Employees = () => {
-  const [employees, setEmployees] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState("")
-  const [selectedDept, setSelectedDept] = useState("")
-  const [editEmployee, setEditEmployee] = useState(null)
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selectedDept, setSelectedDept] = useState("");
+  const [editEmployee, setEditEmployee] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const fetchEmployees = useCallback(async () => {
     try {
-      setLoading(true)
-      const url = selectedDept ? `/employees?department=${selectedDept}` : `/employees`;
+      setLoading(true);
+      const url = selectedDept ? `/employees?department=${encodeURIComponent(selectedDept)}` : "/employees";
       const res = await api.get(url);
-      setEmployees(res.data)
+      setEmployees(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error("Error fetching employees:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [selectedDept])
+  }, [selectedDept]);
 
   useEffect(() => {
     fetchEmployees();
-  }, [fetchEmployees])
+  }, [fetchEmployees]);
 
-  const filtered = employees.filter((emp) => (`${emp.firstName} ${emp.lastName} ${emp.position}`.toLowerCase().includes(search.toLowerCase())))
+  const q = search.toLowerCase().trim();
+  const filtered = employees.filter((emp) =>
+    `${emp.firstName} ${emp.lastName} ${emp.position} ${emp.department}`
+      .toLowerCase()
+      .includes(q)
+  );
 
   return (
     <div className="animate-fade-in">
-      {/*----header----*/}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap- mb-8">
-        <div>
-          <h1 className="page-title">
-            Employees
-          </h1>
-          <p className="page-subtitle">
-            Manage your Team Members
-          </p>
-        </div>
-        <button onClick={() => setShowCreateModal(true)} className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center">
-          <Plus size={16} />
-          Add Employee
-        </button>
-      </div>
-      {/*----search----*/}
+      <PageHeader
+        title="Employees"
+        subtitle="Manage your team members"
+        action={
+          <button onClick={() => setShowCreateModal(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />
+            Add Employee
+          </button>
+        }
+      />
+
+      {/* Search + filter */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 w- h-4" />
-          <input placeholder="Search Employees...." className="w-full pl-10!" onChange={(e) => setSearch(e.target.value)} value={search} />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search employees..."
+            className="input pl-10"
+            aria-label="Search employees"
+          />
         </div>
-        <select value={selectedDept} onChange={(e) => setSelectedDept(e.target.value)} className="max-w-40">
-          <option value=''>
-            All Departments
-          </option>
-          {DEPARTMENTS.map((deptName) => (
-            <option key={deptName} value={deptName}>
-              {deptName}
+        <select
+          value={selectedDept}
+          onChange={(e) => setSelectedDept(e.target.value)}
+          className="select sm:w-56"
+          aria-label="Filter by department"
+        >
+          <option value="">All Departments</option>
+          {DEPARTMENTS.map((dept) => (
+            <option key={dept} value={dept}>
+              {dept}
             </option>
           ))}
         </select>
       </div>
 
-      {/*----employees----*/}
-
       {loading ? (
-        <div className="flex justify-center p-12">
-          <div className="animate-spin h-8 w-8 border-2 border-indigo-600 border-t-transparent rounded-full" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="card p-5">
+              <div className="animate-pulse space-y-3">
+                <div className="w-12 h-12 rounded-full bg-ink-100" />
+                <div className="h-4 bg-ink-100 rounded w-1/2" />
+                <div className="h-3 bg-ink-100 rounded w-2/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card">
+          <EmptyState
+            icon={Users}
+            title={employees.length === 0 ? "No employees yet" : "No results found"}
+            description={
+              employees.length === 0
+                ? "Add your first employee to get started."
+                : "Try adjusting your search or filter."
+            }
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-          {filtered.length === 0 ? (
-            <p className="col-span-full text-center py-16 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
-              No Employees Found
-            </p>
-          ) : (
-            filtered.map((emp) => (
-              <EmployeeCard
-                key={emp._id || emp.id}
-                employee={emp}
-                onDelete={fetchEmployees}
-                onEdit={(e) => setEditEmployee(e)}
-              />
-            ))
-          )}
-        </div>
-      )
-      }
-      {/*Create Employee Model */}
-      {showCreateModal && (
-        <div className="fixed bg-black/40 backdrop-blur-sm inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto" onClick={() =>
-          setShowCreateModal(false)
-        }>
-
-          <div className="fixed inset-0">
-            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-fade-in" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between p-6 pb-0">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    Add New Employee
-                  </h2>
-                  <p className="text-sm text-slate-500 my-0.5">
-                    Create a user account and employee Profile
-                  </p>
-                </div>
-                <button onClick={() => setShowCreateModal(false)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="p-6">
-                <EmployeeForm onSucess={() => {
-                  setShowCreateModal(false)
-                  fetchEmployees()
-                }} onCancel={() => setShowCreateModal(false)} />
-              </div>
-            </div>
-          </div>
+          {filtered.map((emp) => (
+            <EmployeeCard
+              key={emp._id || emp.id}
+              employee={emp}
+              onDelete={fetchEmployees}
+              onEdit={(e) => setEditEmployee(e)}
+            />
+          ))}
         </div>
       )}
 
-      {/* Edit Employee Modal */}
-      {editEmployee && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto bg-black/40 backdrop-blur-sm" onClick={() => setEditEmployee(null)}>
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 animate-fade-in" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-6 pb-0">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Edit Employee
-                </h2>
-                <p className="text-sm text-slate-500 my-0.5">
-                  Update Employee Details.
-                </p>
-              </div>
-              <button onClick={() => setEditEmployee(null)} className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* Create modal */}
+      <Modal
+        open={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Add New Employee"
+        description="Create a user account and employee profile"
+      >
+        <EmployeeForm
+          onSucess={() => {
+            setShowCreateModal(false);
+            fetchEmployees();
+          }}
+          onCancel={() => setShowCreateModal(false)}
+        />
+      </Modal>
 
-            <div className="p-6">
-              <EmployeeForm initialData={editEmployee} onSucess={() => {
-                setEditEmployee(null);
-                fetchEmployees();
-              }} onCancel={() => setEditEmployee(null)} />
-            </div>
+      {/* Edit modal */}
+      <Modal
+        open={!!editEmployee}
+        onClose={() => setEditEmployee(null)}
+        title="Edit Employee"
+        description="Update employee details"
+      >
+        {editEmployee && (
+          <EmployeeForm
+            initialData={editEmployee}
+            onSucess={() => {
+              setEditEmployee(null);
+              fetchEmployees();
+            }}
+            onCancel={() => setEditEmployee(null)}
+          />
+        )}
+      </Modal>
+    </div>
+  );
+};
 
-          </div>
-
-        </div>
-      )}
-
-
-    </div >
-  )
-}
-
-export default Employees
+export default Employees;

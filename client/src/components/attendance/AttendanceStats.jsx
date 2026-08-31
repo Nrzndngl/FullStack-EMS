@@ -1,37 +1,31 @@
-import { ClockIcon, AlertCircleIcon, CalendarIcon } from "lucide-react"
+import { CalendarCheck, AlertCircle, Clock } from "lucide-react";
+import StatCard from "../ui/StatCard";
 
 const AttendanceStats = ({ history }) => {
-    const totalPresent = history.filter((h) => h.status === "PRESENT" | h.status === "LATE").length;
+  const totalPresent = history.filter((h) => h.status === "PRESENT" || h.status === "LATE").length;
+  const totalLate = history.filter((h) => h.status === "LATE").length;
 
-    const totalLate = history.filter((h) => h.status === "LATE").length;
+  const hours = history
+    .map((h) => Number(h.workingHours))
+    .filter((n) => !isNaN(n) && n > 0);
+  const avgHours =
+    hours.length > 0
+      ? (hours.reduce((a, b) => a + b, 0) / hours.length).toFixed(1)
+      : "—";
 
-    const stats = [
-        { label: "Days Present", value: totalPresent, icon: CalendarIcon },
-        { label: "Late Arrivals", value: totalLate, icon: AlertCircleIcon },
-        { label: "Avg. Work Hrs", value: "8.5 Hrs", icon: ClockIcon },
-    ]
-    return (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-8">
-            {stats.map((s) => (
-                <div key={s.label} className="card card-hover p-5 sm:p-6 flex items-center gap-4 relative overflow-hidden group">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-slate-500/70 group-hover:bg-indigo-500/70" />
-                    <div className="p-3 bg-slate-100 rounded-lg group-hover:bg-indigo-50 transition-colors duration-200">
-                        <s.icon className="w-5 h-5 text-slate-600 group-hover:text-indigo-600 transition-colors duration-200" />
-                    </div>
-                    <div>
-                        <p className="text-sm text-slate-500">
-                            {s.label}
-                        </p>
-                        <p className="text-2xl font-medium text-slate-900 tracking-tight">
-                            {s.value}
-                        </p>
-                    </div>
-                </div>
-            ))
-            }
-        </div>
-    )
-}
+  const stats = [
+    { icon: CalendarCheck, value: totalPresent, label: "Days Present", hint: "Present or late", tone: "primary" },
+    { icon: AlertCircle, value: totalLate, label: "Late Arrivals", hint: "This period", tone: "warning" },
+    { icon: Clock, value: `${avgHours} hrs`, label: "Avg. Work Hours", hint: "Per recorded day", tone: "ink" },
+  ];
 
-export default AttendanceStats
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-4">
+      {stats.map((s) => (
+        <StatCard key={s.label} {...s} />
+      ))}
+    </div>
+  );
+};
 
+export default AttendanceStats;

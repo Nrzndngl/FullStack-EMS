@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
-import { dummyPayslipData } from "../assets/assets"
 import Loading from "../components/Loading"
 import { format } from "date-fns"
 import api from "../api/axios"
+import Button from "../components/ui/Button"
+import { Printer } from "lucide-react"
 
 const PrintPayslip = () => {
   const { id } = useParams()
@@ -16,99 +17,86 @@ const PrintPayslip = () => {
   if (loading) return <Loading />
   if (!payslip) return <div className="text-center py-12 text-slate-400">Payslip not found</div>
 
-  return (
-    <div className="max-w-2x1 mx-auto p-8 bg-white animate-fade-in">
-      <div className='text-center border-b border-slate-200 pb-6 mb-8'>
-        <h1 className='text-2xl font-bold text-slate-900 tracking-tight'>PAYSLIP</h1>
-        <p className='text-slate-500 text-sm mt-1'>
-          {format(new Date(payslip.year,
-            payslip.month - 1), "MMMM yyyy")}
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-6 mb-8">
-        <div>
-          <p className='text-xs text-slate-400 uppercase tracking-wider mb-1'>
-            Employee Name
-          </p>
-          <p className=' font-semibold text-slate-900'>{payslip.employee?.firstName}
-            {payslip.employee?.lastName}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
-            Position
-          </p>
-          <p className="font-semibold text-slate-900">
-            {payslip.employee?.position}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
-            Email
-          </p>
-          <p className="font-semibold text-slate-900">
-            {payslip.employee?.email}</p>
-        </div>
-        <div>
-          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">
-            Period
-          </p>
-          <p className="font-semibold text-slate-900">
-            {format(new Date(payslip.year, payslip.month - 1), "MMMM yyyy")}
-          </p>
-        </div>
-      </div>
-      <div className="rounded-xl border border-slate-200 overflow-hidden mb-8">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50">
-              <th className="text-left py-3 px-4 text-xs test-slate-500 uppercase tracking-wider">
-                Description
-              </th>
-              <th className="text-left py-3 px-4 text-xs test-slate-500 uppercase tracking-wider">
-                Amount
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-t border-slate-100">
-              <td className="py-3 px-4 text-slate-700">
-                Basic Salary
-              </td>
-              <td className="text-right py-3 px-4 text-slate-900 font-medium">
-                ${payslip.basicSalary?.toLocaleString()}
-              </td>
-            </tr>
-            <tr className="border-t border-slate-100">
-              <td className="py-3 px-4 text-slate-700">
-                Allownces
-              </td>
-              <td className="text-right py-3 px-4 text-slate-900 font-medium">
-                +${payslip.allowances?.toLocaleString()}
-              </td>
-            </tr>
-            <tr className="border-t border-slate-100">
-              <td className="py-3 px-4 text-slate-700">
-                Deductions
-              </td>
-              <td className="text-right py-3 px-4 text-rose-900 font-medium">
-                -${payslip.deductions?.toLocaleString()}
-              </td>
-            </tr>
-            <tr className="border-t border-slate-100 bg-slate-50">
-              <td className="py-3 px-4 text-slate-700 font-bold">
-                Net Salary
-              </td>
-              <td className="text-right py-3 px-4 font-bold text-slate-900 text-lg">
-                ${payslip.netSalary?.toLocaleString()}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div className="text-center">
-        <button className="btn-primary print:hidden" onClick={() => window.print()}>
-          Print Payslip
-        </button>
+  const period = format(new Date(payslip.year, payslip.month - 1), "MMMM yyyy")
 
+  const rows = [
+    { label: "Basic Salary", value: `$${payslip.basicSalary?.toLocaleString()}`, tone: "base" },
+    { label: "Allowances", value: `+$${payslip.allowances?.toLocaleString()}`, tone: "base" },
+    { label: "Deductions", value: `-$${payslip.deductions?.toLocaleString()}`, tone: "danger" },
+    { label: "Net Salary", value: `$${payslip.netSalary?.toLocaleString()}`, tone: "strong" },
+  ]
+
+  const details = [
+    { label: "Employee Name", value: (payslip.employee?.firstName || "") + " " + (payslip.employee?.lastName || "") },
+    { label: "Position", value: payslip.employee?.position },
+    { label: "Email", value: payslip.employee?.email },
+    { label: "Period", value: period },
+  ]
+
+  return (
+    <div className="max-w-2xl mx-auto p-4 sm:p-8 animate-fade-in print:p-0 print:max-w-none">
+      <div className="bg-white rounded-2xl border border-ink-100 shadow-sm overflow-hidden print:shadow-none print:border-0">
+        <div className="border-b border-ink-100 px-8 py-8 text-center">
+          <p className="text-xs uppercase tracking-[0.2em] text-primary-600 font-semibold mb-1">FullStack EMS</p>
+          <h1 className="text-2xl font-bold text-ink-900 tracking-tight">PAYSLIP</h1>
+          <p className="text-ink-500 text-sm mt-1">{period}</p>
+        </div>
+
+        <div className="px-8 py-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+            {details.map((d) => (
+              <div key={d.label}>
+                <p className="text-xs text-ink-400 uppercase tracking-wider mb-1">{d.label}</p>
+                <p className="font-semibold text-ink-900">{d.value || "—"}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-xl border border-ink-100 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-ink-50">
+                  <th className="text-left py-3 px-4 text-xs text-ink-500 uppercase tracking-wider font-medium">
+                    Description
+                  </th>
+                  <th className="text-right py-3 px-4 text-xs text-ink-500 uppercase tracking-wider font-medium">
+                    Amount
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => (
+                  <tr
+                    key={row.label}
+                    className={i === rows.length - 1 ? "bg-ink-50 border-t border-ink-100" : "border-t border-ink-100"}
+                  >
+                    <td className={`py-3 px-4 ${row.tone === "strong" ? "font-bold text-ink-900" : "text-ink-700"}`}>
+                      {row.label}
+                    </td>
+                    <td
+                      className={`text-right py-3 px-4 ${
+                        row.tone === "danger"
+                          ? "text-rose-600 font-medium"
+                          : row.tone === "strong"
+                          ? "font-bold text-ink-900 text-lg"
+                          : "text-ink-900 font-medium"
+                      }`}
+                    >
+                      {row.value}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="text-center mt-8 print:hidden">
+            <Button onClick={() => window.print()}>
+              <Printer className="w-4 h-4" />
+              Print Payslip
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   )

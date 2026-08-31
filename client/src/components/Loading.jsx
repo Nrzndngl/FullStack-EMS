@@ -1,9 +1,11 @@
-const Loading = () => {
-    return (
-        <div className="flex justify-center h-screen item-center">
-            <div className="animate-spin size-8 border-2 border-indigo-600 border-t-transparent rounded-full" />
-        </div>
+import Spinner from "./ui/Spinner";
 
-    )
-}
-export default Loading
+const Loading = ({ full = true }) => {
+  return (
+    <div className={`flex items-center justify-center ${full ? "min-h-screen" : "min-h-[40vh]"}`}>
+      <Spinner />
+    </div>
+  );
+};
+
+export default Loading;

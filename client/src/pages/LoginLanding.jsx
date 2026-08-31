@@ -1,74 +1,77 @@
-import LoginLeftSide from "../components/LoginLeftSide"
-import { ArrowRightIcon, ShieldIcon, UserIcon } from "lucide-react"
-import { Link, Navigate } from "react-router-dom"
-import Loading from "../components/Loading"
-import { useAuth } from "../context/AuthContext"
+import LoginLeftSide from "../components/LoginLeftSide";
+import { ArrowRight, Shield, User } from "lucide-react";
+import { Link, Navigate } from "react-router-dom";
+import Loading from "../components/Loading";
+import { useAuth } from "../context/AuthContext";
 
 const LoginLanding = () => {
-    const { user, loading } = useAuth()
+  const { user, loading } = useAuth();
 
-    if (loading) return <Loading />
-    if (user) {
-        return <Navigate to="/" />
-    }
+  if (loading) return <Loading />;
+  if (user) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
-    const portalOptions = [
-        {
-            to: "/login/admin",
-            title: "Admin Portal",
-            description: "Login to your admin account",
-            icon: <ShieldIcon />
-        },
-        {
-            to: "/login/employee",
-            title: "Employee Portal",
-            description: "Login to your employee account",
-            icon: <UserIcon />
-        }
-    ];
+  const portalOptions = [
+    {
+      to: "/login/admin",
+      title: "Admin Portal",
+      description: "Manage employees, attendance, leaves & payroll",
+      icon: Shield,
+    },
+    {
+      to: "/login/employee",
+      title: "Employee Portal",
+      description: "Clock in, apply for leave & view your payslips",
+      icon: User,
+    },
+  ];
 
-    return (
-        <div className="min-h-screen flex flex-col md:flex-row">
-            <LoginLeftSide />
-            <div className="w-full md:w-1/2 flex items-center justify-center p-6 sm:p-12 lg:p-16 relative overflow-y-auto min-h-screen">
+  return (
+    <div className="min-h-screen flex flex-col md:flex-row bg-canvas">
+      <LoginLeftSide />
 
-                <div className="w-full max-w-md animate-fade-in relative z-10">
+      <div className="flex-1 flex items-center justify-center p-6 sm:p-12 bg-canvas min-h-screen">
+        <div className="w-full max-w-md animate-slide-up">
+          <div className="md:hidden flex items-center gap-2 mb-8 justify-center">
+            <span className="w-8 h-8 rounded-lg bg-primary-600 text-white flex items-center justify-center">
+              <User className="w-4 h-4" />
+            </span>
+            <span className="font-semibold text-ink-900">QuickEMS</span>
+          </div>
 
-                    {/* Header */}
-                    <div className="mb-10 text-center md:text-left">
-                        <h2 className="text-3xl font-medium text-slate-900  tracking-tight mb-3">
-                            Welcome Back
-                        </h2>
-                        <p className="text-slate-500">
-                            Select your login portal to access your account and manage your tasks efficiently.
-                        </p>
-                    </div>
+          <div className="mb-9">
+            <h2 className="text-3xl font-semibold text-ink-900 tracking-tight mb-2">Welcome Back</h2>
+            <p className="text-ink-500">Select a portal to sign in and continue to your dashboard.</p>
+          </div>
 
-                    {/* Portal Options */}
-                    <div className="space-y-4">
-                        {portalOptions.map((portal) => (
-                            <Link key={portal.to} to={portal.to} className="group block bg-slate-50 border border-slate-200 rounded-lg p-5 sm:p-6 transition-akl duration-300 hover:border-indigo-400 hover:bg-indigo-50">
-                                <div clsassName="relative z-10 flex items-center justify-betweeen gap-4 sm:gap-5">
-                                    <h3 className="text-lg text-slate-800 group-hover:text-indigo-600 mb-1 transition-colors">
-                                        {portal.title}
-                                    </h3>
-                                    <ArrowRightIcon className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all duration-300" />
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-
-                    {/* Footer */}
-                    <div className="mt-10 text-center">
-                        <p className="text-slate-500 text-sm">
-                            © {new Date().getFullYear()} FullStack-EMS. All rights reserved.
-                        </p>
-                    </div>
-                </div>
-            </div>
+          <div className="space-y-4">
+            {portalOptions.map((portal) => {
+              const Icon = portal.icon;
+              return (
+                <Link
+                  key={portal.to}
+                  to={portal.to}
+                  className="group flex items-center gap-4 bg-surface border border-ink-200 rounded-2xl p-5 transition-all hover:border-primary-400 hover:shadow-md hover:shadow-primary-600/5"
+                >
+                  <span className="w-12 h-12 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0 group-hover:bg-primary-100 transition-colors">
+                    <Icon className="w-6 h-6" />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-semibold text-ink-900 group-hover:text-primary-700 transition-colors">
+                      {portal.title}
+                    </span>
+                    <span className="block text-sm text-ink-500 mt-0.5">{portal.description}</span>
+                  </span>
+                  <ArrowRight className="w-5 h-5 text-ink-300 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" />
+                </Link>
+              );
+            })}
+          </div>
         </div>
-    )
-}
+      </div>
+    </div>
+  );
+};
 
-
-export default LoginLanding
+export default LoginLanding;

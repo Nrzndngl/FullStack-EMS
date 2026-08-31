@@ -1,66 +1,59 @@
-import { PencilIcon, Trash2Icon } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react";
 import api from "../api/axios";
 import toast from "react-hot-toast";
+import Avatar from "./ui/Avatar";
+import Badge from "./ui/Badge";
 
 const EmployeeCard = ({ employee, onDelete, onEdit }) => {
+  const employeeId = employee._id || employee.id;
+  const fullName = `${employee.firstName || ""} ${employee.lastName || ""}`.trim();
 
-    const employeeId = employee._id || employee.id;
-
-    const handleDelete = async () => {
-        if (!confirm("Are you sure you want to delete this employee?"))
-            return;
-        try {
-            await api.delete(`/employees/${employeeId}`)
-            onDelete()
-        } catch (error) {
-            toast.error(error.response?.data?.error || error.message);
-        }
+  const handleDelete = async () => {
+    if (!window.confirm(`Delete ${fullName}? This action cannot be undone.`)) return;
+    try {
+      await api.delete(`/employees/${employeeId}`);
+      toast.success("Employee deleted");
+      onDelete?.();
+    } catch (error) {
+      toast.error(error.response?.data?.error || error.message);
     }
-    return (
-        <div className="group relative card card-hover overflow-hidden">
+  };
 
-            <div className="relative aspect-4/3 w-full overflow-hidden bg-linear-to-br from-slate-100 to-slate-50">
-                <div className="w-full h-full flex items-center justify-center">
-                    <div className="w-20 h-20 rounded-full bg-linear-to-br from-indigo-100 to-slate-100 flex items-center justify-center">
-                        <span className="tex-2xl font-medium text-indigo-400">
-                            {employee.firstName[0]}{employee.lastName[0]}
-                        </span>
+  return (
+    <div className="group card p-5 hover:shadow-md hover:shadow-ink-900/5 transition-shadow">
+      <div className="flex items-start justify-between mb-4">
+        <Avatar name={fullName} className="w-12 h-12 text-sm" />
+        <Badge tone={employee.isDeleted ? "ink" : "primary"}>{employee.department || "Remote"}</Badge>
+      </div>
 
-                    </div>
+      <h3 className="text-ink-900 font-semibold truncate">{fullName}</h3>
+      <p className="text-sm text-ink-500 truncate">{employee.position}</p>
 
-                </div>
-            </div>
+      <div className="mt-5 pt-4 border-t border-ink-100 flex items-center justify-between">
+        <span className="text-xs text-ink-400">
+          {employee.isDeleted ? "Deactivated" : "Active"}
+        </span>
+        {!employee.isDeleted && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => onEdit?.(employee)}
+              aria-label={`Edit ${fullName}`}
+              className="p-2 rounded-lg text-ink-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={handleDelete}
+              aria-label={`Delete ${fullName}`}
+              className="p-2 rounded-lg text-ink-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
-            <div className="absolute top-3 right-3 flex gap-2">
-                <span className="bg-white/90 backdrop-blur-sm px-2.5 py-1 text-xs font-semibold text-slate-600 rounded-lg shadow-sm">
-                    {employee.department || "Remote"}
-                </span>
-                {employee.isDeleted && <span className="px-2.5 py-1 text-xs font-semibold text-slate-600 rounded-lg shadow-sm">Deleted</span>}
-            </div>
-
-            {!employee.isDeleted && (
-                <div className="absolute inset-0 bg-linear-to-t from-indigo-700/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-6 gap-3">
-                    <button onClick={() => onEdit(employee)} className="p-2.5 bg-white/90 backdrop-blur-sm text-slate-700 hover:text-indigo-600 rounded-xl shadow-lg transition-all hover:scale-105">
-                        <PencilIcon className="w-4 h-4" />
-                    </button>
-                    <button onClick={handleDelete} className="p-2.5 bg-white/90 backdrop-blur-sm text-slate-700 hover:text-rose-600 rounded-xl shadow-lg transition-all hover:scale-105 disabled:opacity-50">
-                        <Trash2Icon className="w-4 h-4" />
-                    </button>
-
-                </div>
-            )}
-
-            <div className="p-5">
-                <h3 className="text-slate-900">
-                    {employee.firstName}
-                    {employee.lastName}
-                </h3>
-                <p className="text-xs text-slate-500">
-                    {employee.position}
-                </p>
-            </div>
-        </div>
-    )
-}
-
-export default EmployeeCard
+export default EmployeeCard;
