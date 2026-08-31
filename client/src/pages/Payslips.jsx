@@ -40,7 +40,7 @@ const Payslips = () => {
       <PageHeader
         title="Payslips"
         subtitle={isAdmin ? "Generate and manage employee payslips" : "Your payslip history"}
-        actions={isAdmin && <GeneratePayslipForm employees={employees} onSuccess={fetchPayslips} />}
+        action={isAdmin && <GeneratePayslipForm employees={employees} onSuccess={fetchPayslips} />}
       />
       <PayslipList payslips={payslips} isAdmin={isAdmin} />
     </div>
