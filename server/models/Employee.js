@@ -45,7 +45,7 @@ const employeeSchema = new mongoose.Schema({
         enum: ["ACTIVE", "INACTIVE"],
         default: "ACTIVE"
     },
-    joindate: {
+    joinDate: {
         type: Date,
         required: true
     },
