@@ -1,9 +1,11 @@
 import { useCallback, useState, useEffect } from "react"
-import { dummyLeaveData } from "../assets/assets"
 import Loading from "../components/Loading"
-import { PalmtreeIcon, PlusIcon, ThermometerIcon, UmbrellaIcon } from "lucide-react"
+import { PalmtreeIcon, Plus, ThermometerIcon, UmbrellaIcon } from "lucide-react"
 import LeaveHistory from "../components/leave/leaveHistory"
 import ApplyLeaveModal from "../components/leave/ApplyLeaveModal"
+import PageHeader from "../components/ui/PageHeader"
+import StatCard from "../components/ui/StatCard"
+import Button from "../components/ui/Button"
 import { useAuth } from "../context/AuthContext"
 import api from "../api/axios"
 import toast from "react-hot-toast"
@@ -36,62 +38,46 @@ const Leave = () => {
 
   if (loading) return <Loading />
 
-  const approvedLeaves = leaves.filter((l) => l.status === "APPROVED")
   const sickCount = leaves.filter((l) => l.type === "SICK").length
-  const casualCount = leaves.filter((l) => l.status === "CASUAL").length
-  const annualCount = approvedLeaves.filter((l) => l.type === "ANNUAL").length
+  const casualCount = leaves.filter((l) => l.type === "CASUAL").length
+  const annualCount = leaves.filter((l) => l.type === "ANNUAL").length
 
   const leaveStats = [
-    { label: "Sick Leave", value: sickCount, icon: ThermometerIcon },
-    { label: "Casual Leave", value: casualCount, icon: UmbrellaIcon },
-    { label: "Annual Leave", value: annualCount, icon: PalmtreeIcon }
+    { label: "Sick Leave Taken", value: sickCount, icon: ThermometerIcon, tone: "danger" },
+    { label: "Casual Leave Taken", value: casualCount, icon: UmbrellaIcon, tone: "warning" },
+    { label: "Annual Leave Taken", value: annualCount, icon: PalmtreeIcon, tone: "primary" },
   ]
 
   return (
-    <div className="animate-fade-in">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div>
-          <h1 className="page-title">
-            Leave Management
-          </h1>
-          <p className="page-subtitle">
-            {isAdmin ? "Manage All Employee Leaves & Leave Policies" : "Track and manage your leave applications"}
-          </p>
-        </div>
-        {!isAdmin && !isDeleted && (
-          <button className="btn-primary flex items-center gap-2 w-full sm:w-auto justify-center" onClick={() => setShowModal(true)}>
-            <PlusIcon className="w-4 h-4" />
-            Apply for Leave
-          </button>
-        )}
-      </div>
+    <div className="animate-fade-in space-y-6">
+      <PageHeader
+        title="Leave Management"
+        subtitle={
+          isAdmin
+            ? "Review, approve and manage all employee leave applications"
+            : "Track your leave balance and apply for time off"
+        }
+        actions={
+          !isAdmin && !isDeleted && (
+            <Button onClick={() => setShowModal(true)}>
+              <Plus className="w-4 h-4" />
+              Apply for Leave
+            </Button>
+          )
+        }
+      />
+
       {!isAdmin && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
           {leaveStats.map((s) => (
-            <div key={s.label} className="card card-hover p-5 sm:p-6 flex items-center gap-4 relative overflow-hidden group">
-              <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-slate-500/70 group-hover:bg-indigo-500/70" />
-              <div className="p-3 bg-slate-100 rounded-lg group-hover:bg-indigo-50 transition-colors duration-200">
-                <s.icon className="w-5 h-5 text-slate-600 group-hover:text-indigo-600 transition-colors duration-200" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">{s.label}</p>
-                <p className="text-2xl font-bold text-slate-900">{s.value}
-                  <span className="text-sm font-normal text-slate-400">
-                    Taken
-                  </span>
-                </p>
-              </div>
-
-            </div>
+            <StatCard key={s.label} icon={s.icon} value={s.value} label={s.label} tone={s.tone} />
           ))}
-
         </div>
-      )
-      }
+      )}
+
       <LeaveHistory leaves={leaves} isAdmin={isAdmin} onUpdate={fetchLeaves} />
       <ApplyLeaveModal open={showModal} onClose={() => setShowModal(false)} onSuccess={fetchLeaves} />
-
-    </div >
+    </div>
   )
 }
 

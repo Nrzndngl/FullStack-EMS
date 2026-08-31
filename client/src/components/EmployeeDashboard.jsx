@@ -1,67 +1,59 @@
-import { ArrowRightIcon, CalendarIcon, DollarSignIcon, FileTextIcon } from "lucide-react";
+import { CalendarCheck, FileText, Wallet, LogIn, Plane } from "lucide-react";
 import { Link } from "react-router-dom";
+import StatCard from "./ui/StatCard";
+import PageHeader from "./ui/PageHeader";
+import Card from "./ui/Card";
+import Avatar from "./ui/Avatar";
 
 const EmployeeDashboard = ({ data }) => {
-    const emp = data.employee;
+  const emp = data.employee;
 
-    const cards = [
-        {
-            icon: CalendarIcon,
-            value: data.currentMonthAttendance,
-            title: "Days Present",
-            Subtitle: "This Month"
-        },
-        {
-            icon: FileTextIcon,
-            value: data.pendingLeaves,
-            title: "Pending Leaves",
-            Subtitle: "Awaiting approval"
-        },
-        {
-            icon: DollarSignIcon,
-            value: data.latestPayslip ? `$${data.latestPayslip.netSalary?.toLocaleString()}` : "N/A",
-            title: "Latest Payslip",
-            subtitle: "Most recent Payout"
-        },
-    ]
+  const cards = [
+    { icon: CalendarCheck, value: data.currentMonthAttendance, label: "Days Present", hint: "This month", tone: "primary" },
+    { icon: FileText, value: data.pendingLeaves, label: "Pending Leaves", hint: "Awaiting approval", tone: "warning" },
+    {
+      icon: Wallet,
+      value: data.latestPayslip ? `$${data.latestPayslip.netSalary?.toLocaleString()}` : "N/A",
+      label: "Latest Payslip",
+      hint: data.latestPayslip ? "Most recent payout" : "No payslip yet",
+      tone: "success",
+    },
+  ];
 
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        title={
+          <span className="flex items-center gap-3">
+            <Avatar name={`${emp?.firstName || ""} ${emp?.lastName || ""}`} className="w-11 h-11 text-sm" />
+            <span>Welcome, {emp?.firstName || "Employee"}!</span>
+          </span>
+        }
+        subtitle={`${emp?.position || "Team Member"} · ${emp?.department || "No Department"}`}
+      />
 
-    return (
-        <div className="animate-fade-in">
-            <div className="page-header">
-                <h1 className="page-title">
-                    Welcome, {emp?.firstName}!
-                </h1>
-                <p className="page-subtitle">
-                    {emp?.position} - {emp?.department || "No Department"}
-                </p>
-            </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-8">
+        {cards.map((c) => (
+          <StatCard key={c.label} {...c} />
+        ))}
+      </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap- sm:gap-5 mb-8">
-                {cards.map((card, index) => (
-                    <div key={index} className="card card-hover p-5 sm:p-6 relative overflow-hidden group flex items-center justify-between">
-                        <div>
-                            <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-slate-500/70 group-hover:bg-indigo-500/70" />
-                            <p className="text-sm font-medium text-slate-700">{card.title}</p>
-                            <p className="text-2xl font-bold text-slate-900">{card.value}</p>
-                        </div>
-                        <card.icon className='size-10 p-2.5 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors duration-200' />
-                    </div>
-                ))}
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3">
-                <Link to="/attendance" className="btn-primary text-center inline-flex items-center justify-center gap-2">
-                    Mark Attendance
-                    <ArrowRightIcon className="w-4 h-4" />
-                </Link>
-                <Link to="/leave" className="btn-secondary text-center">
-                    Apply for Leave
-                </Link>
-            </div>
-
+      <Card className="p-6">
+        <h3 className="text-base font-semibold text-ink-900 mb-1">What would you like to do?</h3>
+        <p className="text-sm text-ink-500 mb-5">Jump straight into your most common tasks.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Link to="/attendance" className="btn-primary justify-center h-12">
+            <LogIn className="w-5 h-5" />
+            Mark Attendance
+          </Link>
+          <Link to="/leave" className="btn-secondary justify-center h-12">
+            <Plane className="w-5 h-5" />
+            Apply for Leave
+          </Link>
         </div>
-    )
-}
+      </Card>
+    </div>
+  );
+};
 
-export default EmployeeDashboard
+export default EmployeeDashboard;

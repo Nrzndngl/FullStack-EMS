@@ -1,59 +1,51 @@
-import { Building2Icon, CalendarIcon, FileTextIcon, UserIcon } from "lucide-react";
+import { Building2, CalendarCheck, FileText, Users, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
+import StatCard from "./ui/StatCard";
+import PageHeader from "./ui/PageHeader";
+import Card from "./ui/Card";
 
 const AdminDashboard = ({ data }) => {
+  const stats = [
+    { icon: Users, value: data.totalEmployees, label: "Total Employees", hint: "Active workforce", tone: "primary" },
+    { icon: Building2, value: data.totalDepartments, label: "Departments", hint: "Organization units", tone: "ink" },
+    { icon: CalendarCheck, value: data.todayAttendance, label: "Today's Attendance", hint: "Checked in today", tone: "success" },
+    { icon: FileText, value: data.pendingLeaves, label: "Pending Leaves", hint: "Awaiting approval", tone: "warning" },
+  ];
 
+  return (
+    <div className="animate-fade-in">
+      <PageHeader
+        title="Dashboard"
+        subtitle="Welcome back, Admin. Here's your overview."
+      />
 
-    const stats = [
-        {
-            icon: UserIcon,
-            value: data.totalEmployees,
-            label: "Total Employees",
-            description: "Active Workforce",
-        },
-        {
-            icon: Building2Icon,
-            value: data.totalDepartments,
-            label: "Departments",
-            description: "Organization units",
-        },
-        {
-            icon: CalendarIcon,
-            value: data.todayAttendance,
-            label: "Today's Attendance",
-            description: "Checked in Today"
-        },
-        {
-            icon: FileTextIcon,
-            value: data.pendingLeaves,
-            label: "Pending Leaves",
-            description: "Applications Awaiting Approval"
-        },
-    ]
-    return (
-        <div className="animate-fade-in">
-            <div className="page-header">
-                <h1 className="page-title">
-                    Dashboard
-                </h1>
-                <p className="page-subtitle">
-                    Welcome back, Admin- Here's Your Overview
-                </p>
-            </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-8">
+        {stats.map((s) => (
+          <StatCard key={s.label} {...s} />
+        ))}
+      </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-8">
-                {stats.map((s) => (
-                    <div key={s.label} className="card card-hover p-5 sm:p-6 relative overflow-hidden group flex items-center justify-between">
-                        <div>
-                            <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full bg-slate-500/70 group-hover:bg-indigo-500/70" />
-                            <p className="text-sm font-medium text-slate-700">{s.label}</p>
-                            <p className="text-2xl font-bold text-slate-900">{s.value}</p>
-                        </div>
-                        <s.icon className='size-10 p-2.5 rounded-lg bg-slate-100 text-slate-600 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors duration-200' />
-                    </div>
-                ))}
-            </div>
+      <Card className="p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-base font-semibold text-ink-900">Quick actions</h3>
+            <p className="text-sm text-ink-500 mt-0.5">Manage your workforce from here.</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/employees" className="btn-primary">
+              Manage Employees <ArrowRight className="w-4 h-4" />
+            </Link>
+            <Link to="/leave" className="btn-secondary">
+              Review Leaves
+            </Link>
+            <Link to="/payslips" className="btn-secondary">
+              Generate Payslips
+            </Link>
+          </div>
         </div>
-    )
+      </Card>
+    </div>
+  );
+};
 
-}
-export default AdminDashboard
+export default AdminDashboard;
