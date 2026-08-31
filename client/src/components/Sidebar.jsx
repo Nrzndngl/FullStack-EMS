@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { data, Link, useLocation } from 'react-router-dom'
 import { dummyProfileData } from '../assets/assets'
-import { CalendarIcon, ChevronRightIcon, DollarSignIcon, FileTextIcon, LayoutGridIcon, LogOutIcon, MenuIcon, SettingsIcon, UserIcon, XIcon } from 'lucide-react'
+import { CalendarIcon, ChevronRightIcon, DollarSignIcon, FileTextIcon, LayoutGridIcon, Loader2, LogOutIcon, MenuIcon, SettingsIcon, UserIcon, XIcon } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import api from '../api/axios'
 
 const Sidebar = () => {
     const { pathname } = useLocation()
     const [userName, setUserName] = useState('')
     const [mobileOpen, setMobileOpen] = useState(false)
 
+    const { user, loading, logout } = useAuth()
+
     useEffect(() => {
-        setUserName(dummyProfileData.firstName + " " + dummyProfileData.lastName)
+        api.get("/profile").then(({ data }) => {
+            if (data.firstName) setUserName(`${data.firstName} ${data.lastName} || ""}`.trim());
+        })
     }, [])
 
     // close mobile sidebar on route change
@@ -17,7 +23,7 @@ const Sidebar = () => {
         setMobileOpen(false)
     }, [pathname])
 
-    const role = "" || "EMPLOYEE";
+    const role = user?.role;
     const navItems = [
         { name: "Dashboard", href: "/dashboard", icon: LayoutGridIcon },
         role === "ADMIN" ?
@@ -28,6 +34,7 @@ const Sidebar = () => {
         { name: "Settings", href: "/setting", icon: SettingsIcon }
     ]
     const handleLogout = () => {
+        logout();
         window.location.href = "/login"
     }
 
@@ -83,38 +90,45 @@ const Sidebar = () => {
 
             {/* Navigation List */}
             <div className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-                {navItems.map((item) => {
-                    const isActive = pathname.startsWith(item.href)
-                    return (
-                        <Link
-                            key={item.name}
-                            to={item.href}
-                            className={`group flex item-center gap-3 px-3 py-2.5 rounded-md text-[13px] font-medium transition-all duration-150 relative ${isActive ? "bg-indigo-500/12 text-indigo-300" : "text-slate-300 hover:text-white hover:bg-white/4"}`}
-                        >
-                            {isActive && (
-                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-indigo-500" />
-                            )}
-                            <item.icon className={`w-[17px] h-[17px] shrink-0 ${isActive ? `text-indigo-300` : `text-slate-400 group-hover:text-slate-300`}`} />
-                            <span className="flex-1" >
-                                {item.name}
-                            </span>
-                            {isActive && (
-                                <ChevronRightIcon className='w-3.5 h-3.5 text-indigo-500/50' />
-                            )}
-                        </Link>
-                    )
-                })}
+                {loading ? (
+                    <div className='px-3 py-3 flex items-center gap-2 text-slate-500'>
+                        <Loader2 className='animate-spin w-4 h-4' />
+                        <span className='text-sm'>Loading...</span>
 
+                    </div>
+                ) : (
+                    navItems.map((item) => {
+                        const isActive = pathname.startsWith(item.href)
+                        return (
+                            <Link
+                                key={item.name}
+                                to={item.href}
+                                className={`group flex item-center gap-3 px-3 py-2.5 rounded-md text-[13px] font-medium transition-all duration-150 relative ${isActive ? "bg-indigo-500/12 text-indigo-300" : "text-slate-300 hover:text-white hover:bg-white/4"}`}
+                            >
+                                {isActive && (
+                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-indigo-500" />
+                                )}
+                                <item.icon className={`w-[17px] h-[17px] shrink-0 ${isActive ? `text-indigo-300` : `text-slate-400 group-hover:text-slate-300`}`} />
+                                <span className="flex-1" >
+                                    {item.name}
+                                </span>
+                                {isActive && (
+                                    <ChevronRightIcon className='w-3.5 h-3.5 text-indigo-500/50' />
+                                )}
+                            </Link>
+                        )
+                    })
+                )}
             </div>
 
             {/* Logout */}
-            <div className="p-3 border-t border-white/6">
+            < div className="p-3 border-t border-white/6" >
                 <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-slate-300 hover:text-white hover:bg-white/4">
                     <LogOutIcon className="w-4 h-4" />
                     <span>Logout</span>
                 </button>
 
-            </div>
+            </div >
         </>
     )
 
