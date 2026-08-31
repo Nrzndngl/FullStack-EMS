@@ -17,5 +17,10 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // This codebase intentionally fetches data inside mount effects;
+      // the strict set-state-in-effect rule flags that standard pattern.
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])

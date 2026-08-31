@@ -18,7 +18,12 @@ import { inngest, functions } from "./inngest/index.js"
 const app = express()
 const PORT = process.env.PORT || 4000;
 
-const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:3000").split(",").map((s) => s.trim());
+const defaultOrigins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://full-stack-ems-bice-pi.vercel.app",
+];
+const allowedOrigins = (process.env.CORS_ORIGINS || defaultOrigins.join(",")).split(",").map((s) => s.trim());
 
 //Middleware
 app.use(cors({
