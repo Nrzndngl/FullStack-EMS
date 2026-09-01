@@ -1,5 +1,5 @@
 import { getDayTypeDisplay, getWorkingHoursDisplay } from "../../assets/assets";
-import { format } from "date-fns";
+import { formatNepalDate, formatNepalTime } from "../../utils/format";
 
 const statusTone = (status) =>
   status === "PRESENT" ? "success" : status === "LATE" ? "warning" : "danger";
@@ -26,13 +26,13 @@ const AttendanceHistory = ({ history }) => {
               return (
                 <tr key={record._id || record.id}>
                   <td className="font-medium text-ink-900">
-                    {format(new Date(record.date), "MMM dd, yyyy")}
+                    {formatNepalDate(record.date)}
                   </td>
                   <td className="text-ink-600">
-                    {record.checkIn ? format(new Date(record.checkIn), "hh:mm a") : "—"}
+                    {record.checkIn ? formatNepalTime(record.checkIn) : "—"}
                   </td>
                   <td className="text-ink-600">
-                    {record.checkOut ? format(new Date(record.checkOut), "hh:mm a") : "—"}
+                    {record.checkOut ? formatNepalTime(record.checkOut) : "—"}
                   </td>
                   <td className="text-ink-600">{getWorkingHoursDisplay(record)}</td>
                   <td>
