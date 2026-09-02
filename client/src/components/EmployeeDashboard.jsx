@@ -4,6 +4,7 @@ import StatCard from "./ui/StatCard";
 import PageHeader from "./ui/PageHeader";
 import Card from "./ui/Card";
 import Avatar from "./ui/Avatar";
+import { formatNPR } from "../utils/format";
 
 const EmployeeDashboard = ({ data }) => {
   const emp = data.employee;
@@ -13,7 +14,7 @@ const EmployeeDashboard = ({ data }) => {
     { icon: FileText, value: data.pendingLeaves, label: "Pending Leaves", hint: "Awaiting approval", tone: "warning" },
     {
       icon: Wallet,
-      value: data.latestPayslip ? `$${data.latestPayslip.netSalary?.toLocaleString()}` : "N/A",
+      value: data.latestPayslip ? formatNPR(data.latestPayslip.netSalary) : "N/A",
       label: "Latest Payslip",
       hint: data.latestPayslip ? "Most recent payout" : "No payslip yet",
       tone: "success",

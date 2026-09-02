@@ -3,6 +3,7 @@ import { Navigate, Outlet } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import { useAuth } from "../context/AuthContext";
 import Loading from "../components/Loading";
+import { todayDisplay } from "../utils/format";
 
 const Layout = () => {
   const { user, loading } = useAuth();
@@ -29,7 +30,7 @@ const Layout = () => {
             Welcome back, <span className="font-medium text-ink-900">{name.split(" ")[0]}</span>
           </p>
           <span className="text-xs text-ink-400">
-            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            {todayDisplay()}
           </span>
         </header>
 

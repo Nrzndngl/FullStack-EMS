@@ -5,13 +5,22 @@ import toast from "react-hot-toast";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
 
-const ApplyLeaveModal = ({ open, onClose, onSuccess }) => {
+const ApplyLeaveModal = ({ open, onClose, onSuccess, balances }) => {
   const [loading, setLoading] = useState(false);
 
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
   const minDate = tomorrow.toISOString().split("T")[0];
+
+  const countDays = (start, end) => {
+    if (!start || !end) return 0;
+    const s = new Date(start + "T00:00:00");
+    const e = new Date(end + "T00:00:00");
+    return Math.round((e - s) / 86400000) + 1;
+  };
+
+  const remainingFor = (type) => balances?.[type];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,6 +29,14 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess }) => {
 
     if (data.endDate && data.startDate && data.endDate < data.startDate) {
       toast.error("End date cannot be before start date.");
+      setLoading(false);
+      return;
+    }
+
+    const days = countDays(data.startDate, data.endDate);
+    const remaining = remainingFor(data.type);
+    if (remaining != null && days > remaining) {
+      toast.error(`Insufficient balance: ${days} day(s) requested, ${remaining} remaining for ${data.type}.`);
       setLoading(false);
       return;
     }
@@ -34,6 +51,12 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess }) => {
       setLoading(false);
     }
   };
+
+  const typeOptions = [
+    { value: "SICK", label: "Sick Leave", balance: remainingFor("SICK") },
+    { value: "CASUAL", label: "Casual Leave", balance: remainingFor("CASUAL") },
+    { value: "ANNUAL", label: "Annual Leave", balance: remainingFor("ANNUAL") },
+  ];
 
   return (
     <Modal
@@ -52,9 +75,12 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess }) => {
             <option value="" disabled>
               Select type
             </option>
-            <option value="SICK">Sick Leave</option>
-            <option value="CASUAL">Casual Leave</option>
-            <option value="ANNUAL">Annual Leave</option>
+            {typeOptions.map((t) => (
+              <option key={t.value} value={t.value}>
+                {t.label}
+                {t.balance != null ? ` (${t.balance} left)` : ""}
+              </option>
+            ))}
           </select>
         </div>
 

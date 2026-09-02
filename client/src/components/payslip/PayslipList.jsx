@@ -1,6 +1,7 @@
 import { format } from "date-fns"
 import { Download } from "lucide-react"
 import EmptyState from "../ui/EmptyState"
+import { formatNPR } from "../../utils/format"
 
 const PayslipList = ({ payslips, isAdmin }) => {
   return (
@@ -34,8 +35,8 @@ const PayslipList = ({ payslips, isAdmin }) => {
                   <td className="text-ink-600">
                     {format(new Date(payslip.year, payslip.month - 1), "MMMM yyyy")}
                   </td>
-                  <td className="text-ink-600">${payslip.basicSalary?.toLocaleString()}</td>
-                  <td className="text-ink-900 font-medium">${payslip.netSalary?.toLocaleString()}</td>
+                  <td className="text-ink-600">{formatNPR(payslip.basicSalary)}</td>
+                  <td className="text-ink-900 font-medium">{formatNPR(payslip.netSalary)}</td>
                   <td className="text-center">
                     <button
                       onClick={() => window.open(`/print/payslips/${payslip._id || payslip.id}`)}

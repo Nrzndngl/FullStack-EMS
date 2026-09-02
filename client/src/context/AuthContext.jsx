@@ -44,6 +44,11 @@ export function AuthProvider({ children }) {
     }
 
     const logout = async () => {
+        try {
+            await api.post("/auth/logout")
+        } catch {
+            // Ignore network errors on logout; local state clears regardless.
+        }
         localStorage.removeItem("token")
         setToken(null);
         setUser(null);

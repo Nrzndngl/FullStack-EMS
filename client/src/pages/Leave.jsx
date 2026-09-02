@@ -13,6 +13,7 @@ import toast from "react-hot-toast"
 const Leave = () => {
   const { user } = useAuth()
   const [leaves, setLeaves] = useState([])
+  const [balances, setBalances] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [isDeleted, setIsDeleted] = useState(false)
@@ -22,6 +23,7 @@ const Leave = () => {
     try {
       const res = await api.get("/leaves")
       setLeaves(res.data.data || [])
+      setBalances(res.data.employee?.leaveBalance || null)
       if (res.data.employee?.isDeleted) {
         setIsDeleted(true);
       }
@@ -43,9 +45,9 @@ const Leave = () => {
   const annualCount = leaves.filter((l) => l.type === "ANNUAL").length
 
   const leaveStats = [
-    { label: "Sick Leave Taken", value: sickCount, icon: ThermometerIcon, tone: "danger" },
-    { label: "Casual Leave Taken", value: casualCount, icon: UmbrellaIcon, tone: "warning" },
-    { label: "Annual Leave Taken", value: annualCount, icon: PalmtreeIcon, tone: "primary" },
+    { label: "Sick Leave Remaining", value: balances?.SICK ?? sickCount, icon: ThermometerIcon, tone: "danger" },
+    { label: "Casual Leave Remaining", value: balances?.CASUAL ?? casualCount, icon: UmbrellaIcon, tone: "warning" },
+    { label: "Annual Leave Remaining", value: balances?.ANNUAL ?? annualCount, icon: PalmtreeIcon, tone: "primary" },
   ]
 
   return (
@@ -76,7 +78,7 @@ const Leave = () => {
       )}
 
       <LeaveHistory leaves={leaves} isAdmin={isAdmin} onUpdate={fetchLeaves} />
-      <ApplyLeaveModal open={showModal} onClose={() => setShowModal(false)} onSuccess={fetchLeaves} />
+      <ApplyLeaveModal open={showModal} onClose={() => setShowModal(false)} onSuccess={fetchLeaves} balances={balances} />
     </div>
   )
 }

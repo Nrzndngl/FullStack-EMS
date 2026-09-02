@@ -8,8 +8,14 @@ const payslipSchema = new mongoose.Schema({
     allowances: { type: Number, default: 0 },
     deductions: { type: Number, default: 0 },
     netSalary: { type: Number, required: true },
+    workingDays: { type: Number, default: null },
+    overtimeHours: { type: Number, default: 0 },
 
 }, { timestamps: true })
+
+payslipSchema.index({ employeeId: 1, month: 1, year: 1 }, { unique: true })
+payslipSchema.index({ year: 1, month: 1 })
+payslipSchema.index({ employeeId: 1, createdAt: -1 })
 
 const Payslip = mongoose.models.Payslip || mongoose.model("Payslip", payslipSchema)
 

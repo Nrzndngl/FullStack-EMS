@@ -40,7 +40,7 @@ const EmployeeForm = ({ initialData, onSucess, onCancel }) => {
     }
 
     try {
-      const url = isEditMode ? `/employees/${initialData.id}` : "/employees";
+      const url = isEditMode ? `/employees/${initialData.id || initialData._id}` : "/employees";
       const method = isEditMode ? "put" : "post";
       await api[method](url, formData);
       toast.success(isEditMode ? "Employee updated" : "Employee created");

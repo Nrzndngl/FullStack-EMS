@@ -3,6 +3,7 @@ import { LogIn, LogOut, CheckCircle2, Clock } from "lucide-react";
 import api from "../../api/axios";
 import toast from "react-hot-toast";
 import Button from "../ui/Button";
+import { formatNepalTime } from "../../utils/format";
 
 const CheckInButton = ({ todayRecord, onAction }) => {
   const [loading, setLoading] = useState(false);
@@ -34,9 +35,7 @@ const CheckInButton = ({ todayRecord, onAction }) => {
   }
 
   const isCheckedIn = !!todayRecord?.checkIn;
-  const timeLabel = todayRecord?.checkIn
-    ? new Date(todayRecord.checkIn).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
-    : null;
+  const timeLabel = todayRecord?.checkIn ? formatNepalTime(todayRecord.checkIn) : null;
 
   return (
     <div className="mb-7 card p-8 flex flex-col items-center justify-center text-center">
