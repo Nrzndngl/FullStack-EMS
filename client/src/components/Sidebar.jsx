@@ -36,8 +36,8 @@ const Sidebar = ({ userName, mobileOpen, setMobileOpen }) => {
     setMobileOpen?.(false);
   }, [pathname, setMobileOpen]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     window.location.href = "/login";
   };
 

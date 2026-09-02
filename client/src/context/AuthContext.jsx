@@ -44,14 +44,16 @@ export function AuthProvider({ children }) {
     }
 
     const logout = async () => {
+        // Clear local auth state synchronously BEFORE the network call so a
+        // navigation triggered at the same time never restores the session.
+        localStorage.removeItem("token")
+        setToken(null)
+        setUser(null)
         try {
             await api.post("/auth/logout")
         } catch {
-            // Ignore network errors on logout; local state clears regardless.
+            // Ignore network errors on logout; local state is already cleared.
         }
-        localStorage.removeItem("token")
-        setToken(null);
-        setUser(null);
     }
 
 
