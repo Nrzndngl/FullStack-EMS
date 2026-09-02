@@ -27,6 +27,7 @@ async function registerAdmin() {
             email: process.env.ADMIN_EMAIL,
             password: hashedPassword,
             role: "ADMIN",
+            name: process.env.ADMIN_NAME || "Administrator",
         })
         console.log("Admin created");
         console.log("\nemail:", admin.email);
