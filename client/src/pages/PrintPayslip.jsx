@@ -5,6 +5,7 @@ import { format } from "date-fns"
 import api from "../api/axios"
 import Button from "../components/ui/Button"
 import { Printer } from "lucide-react"
+import { formatNPR } from "../utils/format"
 
 const PrintPayslip = () => {
   const { id } = useParams()
@@ -20,10 +21,10 @@ const PrintPayslip = () => {
   const period = format(new Date(payslip.year, payslip.month - 1), "MMMM yyyy")
 
   const rows = [
-    { label: "Basic Salary", value: `$${payslip.basicSalary?.toLocaleString()}`, tone: "base" },
-    { label: "Allowances", value: `+$${payslip.allowances?.toLocaleString()}`, tone: "base" },
-    { label: "Deductions", value: `-$${payslip.deductions?.toLocaleString()}`, tone: "danger" },
-    { label: "Net Salary", value: `$${payslip.netSalary?.toLocaleString()}`, tone: "strong" },
+    { label: "Basic Salary", value: `+${formatNPR(payslip.basicSalary)}`, tone: "base" },
+    { label: "Allowances", value: `+${formatNPR(payslip.allowances)}`, tone: "base" },
+    { label: "Deductions", value: `-${formatNPR(payslip.deductions)}`, tone: "danger" },
+    { label: "Net Salary", value: formatNPR(payslip.netSalary), tone: "strong" },
   ]
 
   const details = [

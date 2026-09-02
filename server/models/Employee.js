@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { DEPARTMENTS } from "../constants/departments.js";
+import { LEAVE_ENTITLEMENTS } from "../constants/leave.js";
 
 const employeeSchema = new mongoose.Schema({
     userId: {
@@ -62,8 +63,19 @@ const employeeSchema = new mongoose.Schema({
         enum: DEPARTMENTS,
         required: true
 
+    },
+    leaveBalance: {
+        type: {
+            CASUAL: { type: Number, default: LEAVE_ENTITLEMENTS.CASUAL },
+            SICK: { type: Number, default: LEAVE_ENTITLEMENTS.SICK },
+            ANNUAL: { type: Number, default: LEAVE_ENTITLEMENTS.ANNUAL },
+        },
+        default: () => ({ ...LEAVE_ENTITLEMENTS }),
     }
 }, { timestamps: true })
+
+employeeSchema.index({ email: 1 })
+employeeSchema.index({ department: 1 })
 
 const Employee = mongoose.models.Employee || mongoose.model("Employee", employeeSchema);
 

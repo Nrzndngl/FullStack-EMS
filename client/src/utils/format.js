@@ -1,3 +1,5 @@
+import { adToBs } from "@sonill/nepali-dates";
+
 const TZ = "Asia/Kathmandu";
 
 const dateFmt = (opts) =>
@@ -34,4 +36,31 @@ const nprFmt = new Intl.NumberFormat("en-IN", { style: "currency", currency: "NP
 export function formatNPR(value) {
   if (value == null || isNaN(Number(value))) return "—";
   return nprFmt.format(Number(value));
+}
+
+/* ---------- Bikram Sambat (BS) display ---------- */
+
+const BS_MONTHS = [
+  "Baisakh", "Jestha", "Ashadh", "Shrawan",
+  "Bhadra", "Ashwin", "Kartik", "Mangsir",
+  "Poush", "Magh", "Falgun", "Chaitra",
+];
+
+export const getCalendarPref = () => typeof window !== "undefined" && window.localStorage.getItem("calendar") === "bs";
+export const setCalendarPref = (enabled) => window.localStorage.setItem("calendar", enabled ? "bs" : "ad");
+
+export function formatBSDate(value) {
+  if (!value) return "—";
+  const date = typeof value === "string" || typeof value === "number" ? new Date(value) : value;
+  if (isNaN(date.getTime())) return "—";
+  const { year, month, day } = adToBs(date.getFullYear(), date.getMonth() + 1, date.getDate());
+  return `${BS_MONTHS[month - 1]} ${day}, ${year} BS`;
+}
+
+export function formatDisplayDate(value) {
+  return getCalendarPref() ? formatBSDate(value) : formatNepalDate(value);
+}
+
+export function todayDisplay() {
+  return getCalendarPref() ? formatBSDate(new Date()) : todayInNepal();
 }

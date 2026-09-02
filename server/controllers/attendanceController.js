@@ -1,6 +1,7 @@
 import { inngest } from "../inngest/index.js";
 import Attendance from "../models/Attendance.js";
 import Employee from "../models/Employee.js";
+import { nepalNowTime, startOfNepalDay } from "../utils/time.js";
 
 
 // CLOCK IN/OUT FOR EMPLOYEE
@@ -11,8 +12,7 @@ export const clockInOut = async (req, res) => {
         if (!employee) return res.status(404).json({ error: "Employee not found" })
         if (employee.isDeleted) return res.status(403).json({ error: "Account is deactivated" })
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const today = startOfNepalDay();
 
         const existing = await Attendance.findOne({
             employeeId: employee._id,
@@ -22,7 +22,9 @@ export const clockInOut = async (req, res) => {
 
         // No record yet -> CHECK IN
         if (!existing) {
-            const isLate = now.getHours() > 9 || (now.getHours() === 9 && now.getMinutes() > 0);
+            // Nepal-aware late check (after 9:00 AM Asia/Kathmandu)
+            const { hour, minute } = nepalNowTime();
+            const isLate = hour > 9 || (hour === 9 && minute > 0);
             const attendance = await Attendance.create({
                 employeeId: employee._id,
                 date: today,

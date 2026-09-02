@@ -1,10 +1,10 @@
-import { format } from "date-fns";
 import { Check, Loader2, X } from "lucide-react";
 import { useState } from "react";
 import api from "../../api/axios";
 import toast from "react-hot-toast";
 import Badge from "../ui/Badge";
 import EmptyState from "../ui/EmptyState";
+import { formatBSDate, formatDisplayDate, formatNepalDate, getCalendarPref } from "../../utils/format";
 
 const statusTone = (status) =>
   status === "APPROVED" ? "success" : status === "REJECTED" ? "danger" : "warning";
@@ -26,10 +26,15 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
   };
 
   const formatRange = (leave) => {
-    const start = new Date(leave.startDate);
-    const end = new Date(leave.endDate);
-    if (leave.startDate === leave.endDate) return format(start, "MMM dd, yyyy");
-    return `${format(start, "MMM dd")} – ${format(end, "MMM dd, yyyy")}`;
+    if (!leave.startDate) return "—";
+    if (leave.startDate === leave.endDate || !leave.endDate)
+      return formatDisplayDate(leave.startDate);
+    if (getCalendarPref())
+      return `${formatBSDate(leave.startDate)} – ${formatBSDate(leave.endDate)}`;
+    return `${formatNepalDate(leave.startDate, { month: "short", day: "numeric" })} – ${formatNepalDate(
+      leave.endDate,
+      { year: "numeric", month: "short", day: "numeric" }
+    )}`;
   };
 
   return (

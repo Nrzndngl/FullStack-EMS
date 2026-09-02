@@ -2,15 +2,32 @@ import User from "../models/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
+const ACCESS_TTL = "15m";
+const REFRESH_TTL = "7d";
+const REFRESH_MS = 7 * 24 * 60 * 60 * 1000;
+
+const refreshSecret = () => process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
+
+const buildPayload = (user) => ({
+    userId: user._id.toString(),
+    role: user.role,
+    email: user.email,
+});
+
+const refreshCookieOptions = () => ({
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: REFRESH_MS,
+});
+
 // LOGIN FOR EMPLOYEE AND ADMIN
 export const login = async (req, res) => {
     try {
         const { email, password, role_type } = req.body;
 
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email, password are required" })
-        }
-        const user = await User.findOne({ email })
+        const user = await User.findOne({ email });
         if (!user) {
             return res.status(401).json({ error: "Invalid Credentials" });
         }
@@ -25,20 +42,53 @@ export const login = async (req, res) => {
         if (!isValid) {
             return res.status(401).json({ error: "Invalid Credentials" });
         }
-        const payload = {
-            userId: user._id.toString(),
-            role: user.role,
-            email: user.email,
-        }
-        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "7d" })
 
-        return res.json({ user: payload, token });
+        const payload = buildPayload(user);
+        const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: ACCESS_TTL });
+        const refreshToken = jwt.sign({ userId: user._id.toString() }, refreshSecret(), { expiresIn: REFRESH_TTL });
 
+        res.cookie("refreshToken", refreshToken, refreshCookieOptions());
+        return res.json({ user: payload, token: accessToken });
     } catch (error) {
         console.log("Login error:", error);
         return res.status(500).json({ error: "Login Failed" })
     }
 }
+
+// EXCHANGE VALID REFRESH TOKEN FOR A FRESH ACCESS TOKEN
+export const refresh = async (req, res) => {
+    try {
+        const token = req.cookies?.refreshToken;
+        if (!token) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        let payload;
+        try {
+            payload = jwt.verify(token, refreshSecret());
+        } catch {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        const user = await User.findById(payload.userId);
+        if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+        const session = buildPayload(user);
+        const accessToken = jwt.sign(session, process.env.JWT_SECRET, { expiresIn: ACCESS_TTL });
+        // Rotate the refresh token
+        const refreshToken = jwt.sign({ userId: user._id.toString() }, refreshSecret(), { expiresIn: REFRESH_TTL });
+        res.cookie("refreshToken", refreshToken, refreshCookieOptions());
+
+        return res.json({ user: session, token: accessToken });
+    } catch (error) {
+        return res.status(500).json({ error: "Refresh failed" });
+    }
+}
+
+// LOGOUT: CLEAR REFRESH COOKIE
+export const logout = (req, res) => {
+    res.clearCookie("refreshToken", { ...refreshCookieOptions(), maxAge: undefined });
+    return res.json({ success: true });
+}
+
 // GET SESSION FOR EMPLOYEE AND ADMIN
 export const session = (req, res) => {
     const session = req.session;
@@ -50,12 +100,6 @@ export const changePassword = async (req, res) => {
     try {
         const session = req.session;
         const { currentPassword, newPassword } = req.body;
-        if (!currentPassword || !newPassword) {
-            return res.status(400).json({ error: "Current password and new password are required" });
-        }
-        if (newPassword.length < 8) {
-            return res.status(400).json({ error: "New password must be at least 8 characters long" });
-        }
         const user = await User.findById(session.userId)
         if (!user) return res.status(404).json({ error: "User not found" })
 

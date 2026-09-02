@@ -1,6 +1,9 @@
 import { inngest } from "../inngest/index.js";
 import Employee from "../models/Employee.js";
 import LeaveApplication from "../models/LeaveApplication.js";
+import { dayRangeForDateKey, daysBetweenNepalKeys, nepalDateKey } from "../utils/time.js";
+import { recordAudit } from "../utils/audit.js";
+import { sendLeaveDecisionEmail } from "../utils/notifications.js";
 
 // CREATE LEAVE
 export const createLeave = async (req, res) => {
@@ -24,26 +27,35 @@ export const createLeave = async (req, res) => {
             });
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        if (new Date(startDate) <= today || new Date(endDate) <=
-            today) {
+        // Normalize + validate using Nepal calendar days
+        const startKey = nepalDateKey(new Date(startDate));
+        const endKey = nepalDateKey(new Date(endDate));
+        if (startKey <= nepalDateKey() || endKey <= nepalDateKey()) {
             return res.status(400).json({
                 error: "Leave dates must be in the future"
             });
         }
 
-        if (new Date(endDate) < new Date(startDate)) {
+        if (endKey < startKey) {
             return res.status(400).json({
                 error: "End Date cannot be before start date"
+            });
+        }
+
+        // Leave balance check
+        const requestedDays = daysBetweenNepalKeys(startKey, endKey);
+        const available = employee.leaveBalance?.[type];
+        if (available != null && requestedDays > available) {
+            return res.status(400).json({
+                error: `Insufficient ${type} leave balance (${requestedDays} requested, ${available} remaining)`,
             });
         }
 
         const leave = await LeaveApplication.create({
             employeeId: employee._id,
             type,
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
+            startDate: dayRangeForDateKey(startKey).start,
+            endDate: dayRangeForDateKey(endKey).start,
             reason,
             status: "PENDING",
         })
@@ -108,12 +120,51 @@ export const getLeaves = async (req, res) => {
 export const updateLeaveStatus = async (req, res) => {
     try {
         const { status } = req.body;
-        if (!["APPROVED", "REJECTED", "PENDING"].includes(status)) {
-            return res.status(400).json({
-                error: "Invalid status"
-            });
+        const leave = await LeaveApplication.findById(req.params.id);
+        if (!leave) return res.status(404).json({ error: "Leave not found" });
+
+        if (leave.status === status) {
+            return res.json({ success: true, data: leave });
         }
-        const leave = await LeaveApplication.findByIdAndUpdate(req.params.id, { status }, { returnDocument: "after" });
+
+        // Deduct entitlement exactly once when a request first becomes APPROVED
+        if (status === "APPROVED") {
+            const days = daysBetweenNepalKeys(
+                nepalDateKey(leave.startDate),
+                nepalDateKey(leave.endDate)
+            );
+            await Employee.updateOne(
+                { _id: leave.employeeId },
+                { $inc: { [`leaveBalance.${leave.type}`]: -days } }
+            );
+        }
+
+        leave.status = status;
+        await leave.save();
+
+        await recordAudit({
+            actorId: req.session.userId,
+            action: "LEAVE_STATUS",
+            entity: "LEAVE",
+            entityId: leave._id,
+            details: { status, type: leave.type },
+        });
+
+        if (status === "APPROVED" || status === "REJECTED") {
+            const employee = await Employee.findById(leave.employeeId).lean();
+            if (employee) {
+                await sendLeaveDecisionEmail({
+                    to: employee.email,
+                    employeeName: `${employee.firstName} ${employee.lastName}`,
+                    type: leave.type,
+                    status,
+                    startDate: nepalDateKey(leave.startDate),
+                    endDate: nepalDateKey(leave.endDate),
+                    reason: leave.reason,
+                });
+            }
+        }
+
         return res.json({ success: true, data: leave })
     } catch (error) {
         return res.status(500).json({ error: "Failed" });

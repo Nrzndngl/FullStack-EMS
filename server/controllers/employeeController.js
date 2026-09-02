@@ -1,6 +1,7 @@
 import Employee from "../models/Employee.js";
 import bcrypt from "bcrypt"
 import User from "../models/User.js";
+import { recordAudit } from "../utils/audit.js";
 
 
 // GET EMPLOYEE
@@ -60,6 +61,14 @@ export const createEmployee = async (req, res) => {
         })
         res.status(201).json({ success: true, employee })
 
+        await recordAudit({
+            actorId: req.session.userId,
+            action: "CREATE",
+            entity: "EMPLOYEE",
+            entityId: employee._id,
+            details: { email, role: role || "EMPLOYEE" },
+        });
+
     } catch (error) {
         if (error.code === 11000) {
             return res.status(400).json({ error: "Email already exists" })
@@ -104,13 +113,21 @@ export const updateEmployee = async (req, res) => {
 
         const updated = await Employee.findById(id).lean();
 
+        await recordAudit({
+            actorId: req.session.userId,
+            action: "UPDATE",
+            entity: "EMPLOYEE",
+            entityId: id,
+            details: { email },
+        });
+
         return res.json({ success: true, employee: { ...updated, id: updated._id.toString() } })
 
     } catch (error) {
         if (error.code === 11000) {
             return res.status(400).json({ error: "Email already exists" })
         }
-        return res.status(500).json({ error: "Failed to create employee" })
+        return res.status(500).json({ error: "Failed to update employee" })
 
     }
 }
@@ -126,6 +143,13 @@ export const deleteEmployee = async (req, res) => {
         employee.isDeleted = true;
         employee.employmentStatus = "INACTIVE";
         await employee.save()
+
+        await recordAudit({
+            actorId: req.session.userId,
+            action: "DELETE",
+            entity: "EMPLOYEE",
+            entityId: id,
+        });
 
         return res.json({ success: true })
 

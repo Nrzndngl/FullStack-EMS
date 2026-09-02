@@ -6,12 +6,19 @@ import AttendanceHistory from "../components/attendance/AttendanceHistory";
 import PageHeader from "../components/ui/PageHeader";
 import Badge from "../components/ui/Badge";
 import EmptyState from "../components/ui/EmptyState";
+import Button from "../components/ui/Button";
+import { Download } from "lucide-react";
 import api from "../api/axios";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
+import { downloadBlob } from "../utils/download";
 
 const Attendance = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN" || user?.role_type === "ADMIN";
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -30,16 +37,40 @@ const Attendance = () => {
     fetchData();
   }, [fetchData]);
 
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      const res = await api.get("/reports/attendance", { responseType: "blob" })
+      downloadBlob(res.data, `attendance_${new Date().toISOString().slice(0, 10)}.csv`)
+      toast.success("Attendance exported")
+    } catch (error) {
+      toast.error(error?.response?.data?.error || error?.message || "Export failed")
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayRecord = history.find((r) => {
-    const d = new Date(r.date || r.Date);
+    const d = new Date(r.date);
     return !isNaN(d.getTime()) && d.toDateString() === today.toDateString();
   });
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="Attendance" subtitle="Track your work hours and daily check-ins" />
+      <PageHeader
+        title="Attendance"
+        subtitle="Track your work hours and daily check-ins"
+        action={
+          isAdmin && (
+            <Button variant="secondary" loading={exporting} onClick={exportCsv}>
+              <Download className="w-4 h-4" />
+              Export CSV
+            </Button>
+          )
+        }
+      />
 
       {isDeleted ? (
         <div className="mb-7 p-5 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-700">

@@ -1,14 +1,24 @@
 import Payslip from "../models/Payslip.js";
 import Employee from "../models/Employee.js";
+import Attendance from "../models/Attendance.js";
+import { recordAudit } from "../utils/audit.js";
+import { monthRangeForYearMonth } from "../utils/time.js";
+import { sendPayslipEmail } from "../utils/notifications.js";
 
 // CREATE PAYSLIPS
 export const createPayslip = async (req, res) => {
     try {
         const { employeeId, month, year, basicSalary, allowances,
-            deductions } = req.body;
+            deductions, workingDays, overtimeHours } = req.body;
 
-        if (!employeeId || !month || !year || !basicSalary) {
-            return res.status(400).json({ error: "Missing fields" });
+        const employee = await Employee.findById(employeeId);
+        if (!employee) {
+            return res.status(404).json({ error: "Employee not found" });
+        }
+
+        const existing = await Payslip.findOne({ employeeId, month, year });
+        if (existing) {
+            return res.status(400).json({ error: "Payslip already exists for this employee and month" });
         }
 
         const netSalary = Number(basicSalary) + Number(allowances || 0) - Number(deductions || 0);
@@ -21,11 +31,96 @@ export const createPayslip = async (req, res) => {
             allowances: Number(allowances || 0),
             deductions: Number(deductions || 0),
             netSalary,
+            workingDays: workingDays != null ? Number(workingDays) : null,
+            overtimeHours: Number(overtimeHours || 0),
         });
+
+        await recordAudit({
+            actorId: req.session.userId,
+            action: "PAYSLIP_CREATE",
+            entity: "PAYSLIP",
+            entityId: payslip._id,
+            details: { employeeId, month, year, netSalary },
+        });
+
+        await sendPayslipEmail({
+            to: employee.email,
+            employeeName: `${employee.firstName} ${employee.lastName}`,
+            period: `${year}-${String(month).padStart(2, "0")}`,
+            netSalary,
+        });
+
         return res.json({ success: true, data: payslip });
 
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ error: "Payslip already exists for this employee and month" })
+        }
         return res.status(500).json({ error: "Failed to create payslip" })
+    }
+}
+
+// BATCH-GENERATE PAYSLIPS FOR ALL ACTIVE EMPLOYEES FOR A MONTH
+// Payroll amounts come from each employee's profile; attendance days are counted
+// from the Nepal month range where present/late records exist.
+export const generateBatchPayslips = async (req, res) => {
+    try {
+        const { month, year } = req.body;
+        if (!month || !year) {
+            return res.status(400).json({ error: "month and year are required" });
+        }
+        const { start, end } = monthRangeForYearMonth(Number(year), Number(month));
+
+        const employees = await Employee.find({ isDeleted: { $ne: true } }).lean();
+        let created = 0;
+        let skipped = 0;
+        const errors = [];
+
+        for (const employee of employees) {
+            try {
+                const existing = await Payslip.findOne({ employeeId: employee._id, month: Number(month), year: Number(year) });
+                if (existing) { skipped++; continue; }
+
+                const [workingDays] = await Promise.all([
+                    Attendance.countDocuments({
+                        employeeId: employee._id,
+                        date: { $gte: start, $lt: end },
+                        status: { $in: ["PRESENT", "LATE"] },
+                    }),
+                ]);
+
+                const basicSalary = Number(employee.basicSalary) || 0;
+                const allowances = Number(employee.allowances) || 0;
+                const deductions = Number(employee.deductions) || 0;
+
+                await Payslip.create({
+                    employeeId: employee._id,
+                    month: Number(month),
+                    year: Number(year),
+                    basicSalary,
+                    allowances,
+                    deductions,
+                    netSalary: basicSalary + allowances - deductions,
+                    workingDays,
+                    overtimeHours: 0,
+                });
+                created++;
+            } catch (e) {
+                if (e.code === 11000) { skipped++; continue; }
+                errors.push(`${employee.firstName} ${employee.lastName}: ${e.message}`);
+            }
+        }
+
+        await recordAudit({
+            actorId: req.session.userId,
+            action: "PAYSLIP_BATCH",
+            entity: "PAYSLIP",
+            details: { month, year, created, skipped },
+        });
+
+        return res.json({ success: true, created, skipped, errors });
+    } catch (error) {
+        return res.status(500).json({ error: "Failed to generate batch payslips" });
     }
 }
 

@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 dotenv.config();
 import connectDB from "./config/db.js";
 import multer from "multer";
+import cookieParser from "cookie-parser";
+import rateLimit from "express-rate-limit";
 import authRouter from "./routes/authRoutes.js";
 import employeeRouter from "./routes/employeeRoutes.js";
 import profileRouter from "./routes/profileRoutes.js";
@@ -11,6 +13,8 @@ import attendanceRouter from "./routes/attendanceRoutes.js";
 import leaveRouter from "./routes/leaveRoutes.js";
 import payslipRouter from "./routes/payslipsRoutes.js";
 import dashboardRouter from "./routes/dashboardRoutes.js";
+import reportRouter from "./routes/reportRoutes.js";
+import holidaysRouter from "./routes/holidaysRoutes.js";
 
 import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js"
@@ -35,8 +39,18 @@ app.use(cors({
     credentials: true,
 }));
 app.use(express.json());
+app.use(cookieParser());
 // Parse multipart/form-data (form-driven endpoints send FormData; JSON passes through untouched)
 app.use(multer().none());
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many login attempts, please try again later" },
+});
+app.use("/api/auth", authLimiter);
 
 //Routes
 app.get("/", (req, res) => res.send("Server is running"));
@@ -47,6 +61,8 @@ app.use("/api/attendance", attendanceRouter);
 app.use("/api/leaves", leaveRouter);
 app.use("/api/payslips", payslipRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/reports", reportRouter);
+app.use("/api/holidays", holidaysRouter);
 
 // Set up the "/api/inngest" (recommended) routes with the serve handler
 app.use("/api/inngest", serve({ client: inngest, functions }));

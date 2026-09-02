@@ -3,6 +3,7 @@ import Employee from "../models/Employee.js";
 import LeaveApplication from "../models/LeaveApplication.js";
 import { DEPARTMENTS } from "../constants/departments.js";
 import Payslip from "../models/Payslip.js";
+import { monthRangeForYearMonth, nepalTodayRange, nepalYearMonth } from "../utils/time.js";
 
 // GET DASHBOARD FROM EMPLOYEE AND ADMIN
 export const getDashboard = async (req, res) => {
@@ -12,13 +13,10 @@ export const getDashboard = async (req, res) => {
             const [totalEmployees, todayAttendance, pendingLeaves] = await
                 Promise.all([
                     Employee.countDocuments({ isDeleted: { $ne: true } }),
-                    Attendance.countDocuments({
-                        date: {
-                            $gte: new Date(new Date().setHours(0, 0, 0, 0)),
-                            $lt: new Date(new Date().setHours(24, 0, 0, 0)),
-
-                        }
-                    }),
+                    (async () => {
+                        const { start, end } = nepalTodayRange();
+                        return Attendance.countDocuments({ date: { $gte: start, $lt: end } });
+                    })(),
 
                     LeaveApplication.countDocuments({ status: "PENDING" }),
                 ]);
@@ -36,16 +34,12 @@ export const getDashboard = async (req, res) => {
             }).lean();
             if (!employee) return res.status(404).json({ error: "Employee not found" });
 
-            const today = new Date();
+            const { year, month } = nepalYearMonth();
+            const { start, end } = monthRangeForYearMonth(year, month);
             const [currentMonthAttendance, pendingLeaves, latestPayslip] = await Promise.all([
                 Attendance.countDocuments({
                     employeeId: employee._id,
-                    date: {
-                        $gte: new Date(today.getFullYear(), today.getMonth
-                            (), 1),
-                        $lt: new Date(today.getFullYear(), today.getMonth()
-                            + 1, 1),
-                    }
+                    date: { $gte: start, $lt: end },
                 }),
                 LeaveApplication.countDocuments({
                     employeeId: employee._id,
