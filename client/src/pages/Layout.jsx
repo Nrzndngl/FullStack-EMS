@@ -14,10 +14,7 @@ const Layout = () => {
     return <Navigate to="/login" replace />;
   }
 
-  const name =
-    (user?.firstName ? `${user.firstName} ${user.lastName || ""}` : "") ||
-    user?.email ||
-    "User";
+  const name = user?.name?.trim() || user?.email || "User";
 
   return (
     <div className="min-h-screen bg-canvas flex">

@@ -15,6 +15,10 @@ const UserSchema = new mongoose.Schema({
         enum: ["ADMIN", "EMPLOYEE"],
         default: "EMPLOYEE"
     },
+    name: {
+        type: String,
+        default: ""
+    },
 }, { timestamps: true })
 
 UserSchema.index({ role: 1 })

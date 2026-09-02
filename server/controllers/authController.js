@@ -12,6 +12,7 @@ const buildPayload = (user) => ({
     userId: user._id.toString(),
     role: user.role,
     email: user.email,
+    name: user.name || "",
 });
 
 const refreshCookieOptions = () => ({

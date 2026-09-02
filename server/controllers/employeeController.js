@@ -42,7 +42,8 @@ export const createEmployee = async (req, res) => {
         const user = await User.create({
             email,
             password: hashed,
-            role: role || "EMPLOYEE"
+            role: role || "EMPLOYEE",
+            name: `${firstName} ${lastName}`.trim()
         })
 
         const employee = await Employee.create({
@@ -108,6 +109,7 @@ export const updateEmployee = async (req, res) => {
         const userUpdate = { email }
         if (role) userUpdate.role = role;
         if (password) userUpdate.password = await bcrypt.hash(password, 10);
+        if (firstName || lastName) userUpdate.name = `${firstName || ""} ${lastName || ""}`.trim();
 
         await User.findByIdAndUpdate(employee.userId, userUpdate)
 

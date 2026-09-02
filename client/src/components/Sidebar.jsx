@@ -51,11 +51,10 @@ const Sidebar = ({ userName, mobileOpen, setMobileOpen }) => {
             key={item.name}
             to={item.href}
             aria-current={isActive ? "page" : undefined}
-            className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative ${
-              isActive
+            className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors relative ${isActive
                 ? "bg-primary-50 text-primary-700"
                 : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"
-            }`}
+              }`}
           >
             <item.icon
               className={`w-[18px] h-[18px] shrink-0 ${isActive ? "text-primary-600" : "text-ink-400 group-hover:text-ink-600"}`}
