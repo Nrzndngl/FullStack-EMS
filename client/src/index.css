@@ -241,6 +241,7 @@ body {
     .dark .text-emerald-600 { color: #34d399; }
     .dark .text-emerald-700 { color: #6ee7b7; }
     .dark .bg-rose-50 { background-color: #2a1418; }
+    .dark .hover\:bg-rose-50:hover { background-color: #2a1418; }
     .dark .text-rose-500 { color: #fda4af; }
     .dark .text-rose-600 { color: #fb7185; }
     .dark .text-rose-700 { color: #fda4af; }

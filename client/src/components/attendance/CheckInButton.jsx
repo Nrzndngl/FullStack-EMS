@@ -61,7 +61,12 @@ const CheckInButton = ({ todayRecord, onAction }) => {
       <Button
         onClick={handleAttendance}
         loading={loading}
-        className={`mt-5 px-7 h-12 ${isCheckedIn ? "btn-ghost border border-ink-200" : ""}`}
+        variant={isCheckedIn ? "ghost" : "primary"}
+        className={`mt-5 px-7 h-12 ${
+          isCheckedIn
+            ? "border border-ink-200 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200"
+            : ""
+        }`}
       >
         {loading ? (
           "Processing..."

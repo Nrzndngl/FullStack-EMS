@@ -11,6 +11,7 @@ import {
   XIcon,
   DollarSignIcon,
   ScrollTextIcon,
+  MegaphoneIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Avatar from "./ui/Avatar";
@@ -29,6 +30,7 @@ const Sidebar = ({ userName, mobileOpen, setMobileOpen }) => {
       : { name: "Attendance", href: "/attendance", icon: CalendarIcon },
     { name: "Leave", href: "/leave", icon: FileTextIcon },
     { name: "Payslips", href: "/payslips", icon: DollarSignIcon },
+    ...(role === "ADMIN" ? [{ name: "Announcements", href: "/announcements", icon: MegaphoneIcon }] : []),
     ...(role === "ADMIN" ? [{ name: "Audit Log", href: "/audit", icon: ScrollTextIcon }] : []),
   ];
 

@@ -2,8 +2,10 @@ import Attendance from "../models/Attendance.js";
 import Employee from "../models/Employee.js";
 import LeaveApplication from "../models/LeaveApplication.js";
 import { DEPARTMENTS } from "../constants/departments.js";
+import { LEAVE_ENTITLEMENTS } from "../constants/leave.js";
+import { getHolidays } from "../constants/holidays.js";
 import Payslip from "../models/Payslip.js";
-import { monthRangeForYearMonth, nepalTodayRange, nepalYearMonth } from "../utils/time.js";
+import { monthRangeForYearMonth, nepalTodayRange, nepalYearMonth, nepalDateKey } from "../utils/time.js";
 
 // GET DASHBOARD FROM EMPLOYEE AND ADMIN
 export const getDashboard = async (req, res) => {
@@ -86,7 +88,7 @@ export const getDashboard = async (req, res) => {
 
             const { year, month } = nepalYearMonth();
             const { start, end } = monthRangeForYearMonth(year, month);
-            const [currentMonthAttendance, pendingLeaves, latestPayslip] = await Promise.all([
+            const [currentMonthAttendance, pendingLeaves, latestPayslip, currentMonthOvertime, hasPayslip, hasLeaveThisMonth, hasAttendance] = await Promise.all([
                 Attendance.countDocuments({
                     employeeId: employee._id,
                     date: { $gte: start, $lt: end },
@@ -96,17 +98,46 @@ export const getDashboard = async (req, res) => {
                     status: "PENDING",
                 }),
                 Payslip.findOne({ employeeId: employee._id }).sort({ createdAt: -1 }).lean(),
+
+                // Overtime hours sum this Nepal month
+                (async () => {
+                    const result = await Attendance.aggregate([
+                        { $match: { employeeId: employee._id, date: { $gte: start, $lt: end } } },
+                        { $group: { _id: null, totalOT: { $sum: { $ifNull: ["$overtimeHours", 0] } } } },
+                    ]);
+                    return result.length ? result[0].totalOT : 0;
+                })(),
+
+                Payslip.countDocuments({ employeeId: employee._id }).then((c) => c > 0),
+                LeaveApplication.countDocuments({ employeeId: employee._id }).then((c) => c > 0),
+                Attendance.countDocuments({ employeeId: employee._id }).then((c) => c > 0),
             ]);
+
+            // Next upcoming Nepal holiday (date key > today), searching current + next year
+            const todayKey = nepalDateKey();
+            const holidays = [...getHolidays(year), ...getHolidays(year + 1)];
+            const nextHoliday = holidays.find((h) => h.date > todayKey) || null;
+
+            // Onboarding flags
+            const onboarding = {
+                hasAttendance,
+                hasPayslip,
+                hasLeave: hasLeaveThisMonth,
+            };
 
             return res.json({
                 role: "EMPLOYEE",
                 employee: { ...employee, id: employee._id.toString() },
                 currentMonthAttendance,
+                currentMonthOvertime,
                 pendingLeaves,
+                leaveEntitlements: LEAVE_ENTITLEMENTS,
+                nextHoliday,
                 latestPayslip: latestPayslip ? {
-                    ...latestPayslip, id:
-                        latestPayslip._id.toString()
-                } : null
+                    ...latestPayslip,
+                    id: latestPayslip._id.toString(),
+                } : null,
+                onboarding,
             });
         }
     } catch (error) {

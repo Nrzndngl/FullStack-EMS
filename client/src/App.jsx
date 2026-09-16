@@ -12,6 +12,7 @@ import PrintPayslip from './pages/PrintPayslip'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import AuditLog from './pages/AuditLog'
+import Announcements from './pages/Announcements'
 import LoginForm from './components/LoginForm'
 import Dashboard from './pages/Dashboard'
 
@@ -38,6 +39,7 @@ const App = () => {
         <Route path='/payslips' element={<Payslips />} />
         <Route path='/setting' element={<Setting />} />
         <Route path='/audit' element={<AuditLog />} />
+        <Route path='/announcements' element={<Announcements />} />
       </Route>
       <Route path='/print/payslips/:id' element={<PrintPayslip />} />
 
