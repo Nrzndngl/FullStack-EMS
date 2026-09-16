@@ -15,6 +15,8 @@ import payslipRouter from "./routes/payslipsRoutes.js";
 import dashboardRouter from "./routes/dashboardRoutes.js";
 import reportRouter from "./routes/reportRoutes.js";
 import holidaysRouter from "./routes/holidaysRoutes.js";
+import notificationRouter from "./routes/notificationRoutes.js";
+import auditRouter from "./routes/auditRoutes.js";
 
 import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js"
@@ -63,6 +65,8 @@ app.use("/api/payslips", payslipRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/reports", reportRouter);
 app.use("/api/holidays", holidaysRouter);
+app.use("/api/notifications", notificationRouter);
+app.use("/api/audit", auditRouter);
 
 // Set up the "/api/inngest" (recommended) routes with the serve handler
 app.use("/api/inngest", serve({ client: inngest, functions }));

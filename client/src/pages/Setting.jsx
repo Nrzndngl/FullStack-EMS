@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react"
 import Loading from "../components/Loading"
-import { Lock, Calendar } from "lucide-react"
+import { Lock, Calendar, Moon } from "lucide-react"
 import ProfileForm from "../components/ProfileForm"
 import ChangePasswordModal from "../components/ChangePasswordModal"
 import PageHeader from "../components/ui/PageHeader"
 import Button from "../components/ui/Button"
 import { useAuth } from "../context/AuthContext.jsx"
 import { getCalendarPref, setCalendarPref } from "../utils/format"
+import { getTheme, setTheme } from "../utils/theme"
 import api from "../api/axios.js"
 import toast from "react-hot-toast"
 
@@ -16,6 +17,7 @@ const Setting = () => {
   const [loading, setLoading] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [bsCalendar, setBsCalendar] = useState(getCalendarPref())
+  const [darkMode, setDarkMode] = useState(getTheme())
 
   const fetchProfile = async () => {
     try {
@@ -77,6 +79,44 @@ const Setting = () => {
           <span
             className={`absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
               bsCalendar ? "translate-x-5" : ""
+            }`}
+          />
+        </label>
+      </div>
+
+      <div className="card max-w-md p-6 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-ink-50 rounded-lg">
+            <Moon className="w-5 h-5 text-ink-500" />
+          </div>
+          <div>
+            <p className="font-medium text-ink-900">Dark mode</p>
+            <p className="text-sm text-ink-500">
+              {darkMode
+                ? "Using the dark color scheme."
+                : "Using the light color scheme."}
+            </p>
+          </div>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer shrink-0">
+          <input
+            type="checkbox"
+            className="sr-only"
+            checked={darkMode}
+            onChange={() => {
+              const next = !darkMode
+              setDarkMode(next)
+              setTheme(next)
+            }}
+          />
+          <span
+            className={`w-11 h-6 rounded-full transition-colors ${
+              darkMode ? "bg-primary-600" : "bg-ink-200"
+            }`}
+          />
+          <span
+            className={`absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+              darkMode ? "translate-x-5" : ""
             }`}
           />
         </label>

@@ -96,6 +96,12 @@ const LoginForm = ({ role, title, subtitle }) => {
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {loading ? "Signing in..." : "Sign In"}
             </button>
+
+            <div className="text-center pt-1">
+              <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700 hover:underline transition-colors">
+                Forgot your password?
+              </Link>
+            </div>
           </form>
         </div>
       </div>

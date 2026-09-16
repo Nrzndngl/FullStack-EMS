@@ -1,6 +1,8 @@
 @import url("https://fonts.googleapis.com/css2?family=Outfit:wght@300..900&display=swap");
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
     --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
 
@@ -29,6 +31,39 @@
     --color-ink-700: #334155;
     --color-ink-800: #1e293b;
     --color-ink-900: #0f172a;
+}
+
+.dark {
+    --color-canvas: #0b1120;
+    --color-surface: #151e2f;
+    --color-elevated: #1c2940;
+
+    --color-primary-50:  #1e2548;
+    --color-primary-100: #232c58;
+    --color-primary-200: #2e3a70;
+    --color-primary-300: #3b4a8c;
+    --color-primary-400: #818cf8;
+    --color-primary-500: #6366f1;
+    --color-primary-600: #4f46e5;
+    --color-primary-700: #a5b4fc;
+    --color-primary-800: #c7d2fe;
+    --color-primary-900: #e0e7ff;
+
+    --color-ink-50:  #94a3b8;
+    --color-ink-100: #7e8fa0;
+    --color-ink-200: #6b7d92;
+    --color-ink-300: #5a6b82;
+    --color-ink-400: #64748b;
+    --color-ink-500: #94a3b8;
+    --color-ink-600: #b0bcc8;
+    --color-ink-700: #c9d3df;
+    --color-ink-800: #e2e8f0;
+    --color-ink-900: #f1f5f9;
+}
+
+.dark body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink-900);
 }
 
 * {
@@ -158,6 +193,131 @@ body {
         background: rgba(23, 25, 44, 0.45);
         backdrop-filter: blur(4px);
         animation: fadeIn 0.25s ease-out;
+    }
+
+    /* ===== End of base components ===== */
+}
+
+/* ===== Dark-mode overrides =====
+   Live in @layer utilities so they win over the base utility classes
+   (later layer always wins; same-layer ties broken by specificity `.dark .x`). */
+@layer utilities {
+
+    /* The ink ramp doubles as both backgrounds and text, so we force the
+       most common background utility usages back to dark shades. */
+    .dark .bg-ink-50,
+    .dark .bg-ink-50\/40,
+    .dark .bg-ink-50\/60 {
+        background-color: #1c2940;
+    }
+    .dark .bg-ink-60 {
+        background-color: #141d2e;
+    }
+    .dark .bg-ink-100,
+    .dark .bg-ink-100\/60 {
+        background-color: #223047;
+    }
+    .dark .bg-ink-200 {
+        background-color: #26354e;
+    }
+    .dark .bg-ink-300 {
+        background-color: #33445f;
+    }
+    .dark .bg-ink-400 {
+        background-color: #4a5d78;
+    }
+    .dark .hover\:bg-ink-50:hover,
+    .dark .group-hover\:bg-ink-50:hover {
+        background-color: #1e2940;
+    }
+    .dark .hover\:bg-ink-100:hover {
+        background-color: #243450;
+    }
+    .dark .text-ink-400 { color: #7d8fa6; }
+
+    /* Status chips: keep readable text within dark surfaces */
+    .dark .bg-emerald-50 { background-color: #0d1f17; }
+    .dark .bg-emerald-100 { background-color: #143126; }
+    .dark .text-emerald-600 { color: #34d399; }
+    .dark .text-emerald-700 { color: #6ee7b7; }
+    .dark .bg-rose-50 { background-color: #2a1418; }
+    .dark .text-rose-500 { color: #fda4af; }
+    .dark .text-rose-600 { color: #fb7185; }
+    .dark .text-rose-700 { color: #fda4af; }
+    .dark .bg-amber-50 { background-color: #241d0e; }
+    .dark .text-amber-700 { color: #fcd34d; }
+    .dark .bg-indigo-50 { background-color: #172033; }
+    .dark .text-indigo-600 { color: #a5b4fc; }
+    .dark .text-indigo-700 { color: #c7d2fe; }
+    .dark .bg-blue-100 { background-color: #17233d; }
+    .dark .text-blue-700 { color: #93c5fd; }
+    .dark .bg-slate-100 { background-color: #223047; }
+    .dark .text-slate-600 { color: #94a3b8; }
+
+    .dark .card {
+        border-color: rgba(148, 163, 184, 0.16);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    }
+
+    .dark .btn-secondary {
+        background-color: #1c2940;
+        border-color: #2b3b56;
+        color: #d7e1ee;
+    }
+    .dark .btn-secondary:hover {
+        background-color: #243450;
+        border-color: #3a4d6b;
+    }
+    .dark .btn-ghost {
+        color: #b0bcc8;
+    }
+    .dark .btn-ghost:hover {
+        background-color: #1e2940;
+    }
+
+    .dark .input,
+    .dark .select,
+    .dark .textarea {
+        background-color: #0f172a;
+        border-color: #2b3b56;
+        color: #f1f5f9;
+    }
+    .dark .input:disabled,
+    .dark .select:disabled,
+    .dark .textarea:disabled,
+    .dark .input:read-only {
+        background-color: #1c2940;
+        color: #8b9bb0;
+    }
+
+    .dark .field-label {
+        color: #c9d3df;
+    }
+
+    .dark .table thead th {
+        background-color: #1c2940;
+        color: #94a3b8;
+        border-color: #2b3b56;
+    }
+    .dark .table tbody td {
+        border-color: #1e2a3f;
+    }
+    .dark .table tbody tr:hover {
+        background-color: #1a2437;
+    }
+
+    /* Print sheets stay light even in dark mode */
+    .dark .print-sheet {
+        --color-ink-50: #f8fafc;
+        --color-ink-100: #f1f5f9;
+        --color-ink-200: #e2e8f0;
+        --color-ink-400: #94a3b8;
+        --color-ink-500: #64748b;
+        --color-ink-700: #334155;
+        --color-ink-900: #0f172a;
+        --color-primary-600: #4f46e5;
+        background-color: #ffffff;
+        color: #0f172a;
     }
 }
 

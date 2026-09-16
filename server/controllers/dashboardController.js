@@ -10,7 +10,7 @@ export const getDashboard = async (req, res) => {
     try {
         const session = req.session;
         if (session.role === "ADMIN") {
-            const [totalEmployees, todayAttendance, pendingLeaves] = await
+            const [totalEmployees, todayAttendance, pendingLeaves, departmentDistribution, recentAttendance] = await
                 Promise.all([
                     Employee.countDocuments({ isDeleted: { $ne: true } }),
                     (async () => {
@@ -19,13 +19,63 @@ export const getDashboard = async (req, res) => {
                     })(),
 
                     LeaveApplication.countDocuments({ status: "PENDING" }),
+
+                    // Department distribution
+                    (async () => {
+                        const groups = await Employee.aggregate([
+                            { $match: { isDeleted: { $ne: true } } },
+                            { $group: { _id: "$department", count: { $sum: 1 } } },
+                        ]);
+                        return groups.map((g) => ({ department: g._id, count: g.count }));
+                    })(),
+
+                    // Last 6 months attendance trend
+                    (async () => {
+                        const { year, month } = nepalYearMonth();
+                        const months = [];
+                        for (let i = 5; i >= 0; i--) {
+                            const y = month - i <= 0 ? year - 1 : year;
+                            const m = month - i <= 0 ? month - i + 12 : month - i;
+                            const { start, end } = monthRangeForYearMonth(y, m);
+                            months.push({ y, m, start, end });
+                        }
+
+                        const results = await Promise.all(
+                            months.map(async ({ y, m, start, end }) => {
+                                const all = await Attendance.countDocuments({ date: { $gte: start, $lt: end } });
+                                const late = await Attendance.countDocuments({
+                                    date: { $gte: start, $lt: end },
+                                    status: "LATE",
+                                });
+                                return { year: y, month: m, present: all - late, late, total: all };
+                            })
+                        );
+                        return results;
+                    })(),
                 ]);
+
+            // Payroll totals
+            const payroll = await Payslip.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        totalBasic: { $sum: "$basicSalary" },
+                        totalNet: { $sum: "$netSalary" },
+                        totalOvertime: { $sum: { $ifNull: ["$overtimeHours", 0] } },
+                    },
+                },
+            ]);
+            const payrollTotals = payroll.length ? payroll[0] : { totalBasic: 0, totalNet: 0, totalOvertime: 0 };
+
             return res.json({
                 role: "ADMIN",
                 totalEmployees,
                 totalDepartments: DEPARTMENTS.length,
                 todayAttendance,
-                pendingLeaves
+                pendingLeaves,
+                departmentDistribution,
+                attendanceTrend: recentAttendance,
+                payroll: payrollTotals,
             })
         }
         else {

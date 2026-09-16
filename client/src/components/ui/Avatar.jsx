@@ -1,4 +1,4 @@
-const Avatar = ({ name = "", className = "w-9 h-9 text-xs", tone = "primary" }) => {
+const Avatar = ({ name = "", src = "", className = "w-9 h-9 text-xs", tone = "primary" }) => {
   const initials = (name || "?")
     .split(" ")
     .filter(Boolean)
@@ -11,6 +11,16 @@ const Avatar = ({ name = "", className = "w-9 h-9 text-xs", tone = "primary" }) 
     tone === "primary"
       ? "bg-primary-100 text-primary-700"
       : "bg-ink-100 text-ink-600";
+
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name || "avatar"}
+        className={`rounded-full object-cover shrink-0 ${className}`}
+      />
+    );
+  }
 
   return (
     <span

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { DEPARTMENTS } from "../assets/assets";
-import { Plus, Search, Users } from "lucide-react";
+import { Plus, Search, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import EmployeeCard from "../components/EmployeeCard";
 import EmployeeForm from "../components/EmployeeForm";
 import Modal from "../components/ui/Modal";
@@ -15,19 +15,34 @@ const Employees = () => {
   const [selectedDept, setSelectedDept] = useState("");
   const [editEmployee, setEditEmployee] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 12;
 
   const fetchEmployees = useCallback(async () => {
     try {
       setLoading(true);
-      const url = selectedDept ? `/employees?department=${encodeURIComponent(selectedDept)}` : "/employees";
-      const res = await api.get(url);
-      setEmployees(Array.isArray(res.data) ? res.data : []);
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("pageSize", String(pageSize));
+      if (selectedDept) params.set("department", selectedDept);
+      const res = await api.get(`/employees?${params.toString()}`);
+      const payload = res.data;
+      if (Array.isArray(payload.data)) {
+        setEmployees(payload.data);
+        setTotalPages(payload.totalPages || 1);
+      } else if (Array.isArray(payload)) {
+        setEmployees(payload);
+        setTotalPages(1);
+      } else {
+        setEmployees([]);
+      }
     } catch (error) {
       console.error("Error fetching employees:", error);
     } finally {
       setLoading(false);
     }
-  }, [selectedDept]);
+  }, [page, selectedDept]);
 
   useEffect(() => {
     fetchEmployees();
@@ -67,7 +82,7 @@ const Employees = () => {
         </div>
         <select
           value={selectedDept}
-          onChange={(e) => setSelectedDept(e.target.value)}
+          onChange={(e) => { setSelectedDept(e.target.value); setPage(1); }}
           className="select sm:w-56"
           aria-label="Filter by department"
         >
@@ -105,16 +120,43 @@ const Employees = () => {
           />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-          {filtered.map((emp) => (
-            <EmployeeCard
-              key={emp._id || emp.id}
-              employee={emp}
-              onDelete={fetchEmployees}
-              onEdit={(e) => setEditEmployee(e)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+            {filtered.map((emp) => (
+              <EmployeeCard
+                key={emp._id || emp.id}
+                employee={emp}
+                onDelete={fetchEmployees}
+                onEdit={(e) => setEditEmployee(e)}
+              />
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="p-2 rounded-lg border border-ink-200 hover:bg-ink-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm text-ink-600 px-2">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="p-2 rounded-lg border border-ink-200 hover:bg-ink-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                aria-label="Next page"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {/* Create modal */}
