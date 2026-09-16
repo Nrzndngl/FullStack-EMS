@@ -7,6 +7,10 @@ import Button from "../ui/Button";
 
 const ApplyLeaveModal = ({ open, onClose, onSuccess, balances }) => {
   const [loading, setLoading] = useState(false);
+  const [type, setType] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [reason, setReason] = useState("");
 
   const today = new Date();
   const tomorrow = new Date(today);
@@ -20,32 +24,38 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, balances }) => {
     return Math.round((e - s) / 86400000) + 1;
   };
 
-  const remainingFor = (type) => balances?.[type];
+  const remainingFor = (t) => balances?.[t];
+  const days = startDate && endDate && endDate >= startDate ? countDays(startDate, endDate) : 0;
+  const remaining = remainingFor(type);
+  const overBalance = remaining != null && days > remaining;
+  const invalidRange = startDate && endDate && endDate < startDate;
+
+  const reset = () => {
+    setLoading(false);
+    setType("");
+    setStartDate("");
+    setEndDate("");
+    setReason("");
+  };
+
+  const handleClose = () => {
+    onClose?.();
+    reset();
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (overBalance) {
+      toast.error(`Insufficient balance: ${days} day(s) requested, ${remaining} remaining for ${type}.`);
+      return;
+    }
     setLoading(true);
-    const data = Object.fromEntries(new FormData(e.currentTarget).entries());
-
-    if (data.endDate && data.startDate && data.endDate < data.startDate) {
-      toast.error("End date cannot be before start date.");
-      setLoading(false);
-      return;
-    }
-
-    const days = countDays(data.startDate, data.endDate);
-    const remaining = remainingFor(data.type);
-    if (remaining != null && days > remaining) {
-      toast.error(`Insufficient balance: ${days} day(s) requested, ${remaining} remaining for ${data.type}.`);
-      setLoading(false);
-      return;
-    }
 
     try {
-      await api.post("/leaves", data);
+      await api.post("/leaves", { type, startDate, endDate, reason });
       toast.success("Leave application submitted");
+      handleClose();
       onSuccess?.();
-      onClose?.();
     } catch (error) {
       toast.error(error.response?.data?.error || error?.message || "Failed to submit");
       setLoading(false);
@@ -61,7 +71,7 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, balances }) => {
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       title="Apply for Leave"
       description="Submit your leave request for approval"
       maxWidth="max-w-lg"
@@ -71,7 +81,7 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, balances }) => {
           <label className="field-label flex items-center gap-2">
             <FileText className="w-4 h-4 text-ink-400" /> Leave Type
           </label>
-          <select className="select" name="type" required defaultValue="">
+          <select className="select" value={type} onChange={(e) => setType(e.target.value)} required>
             <option value="" disabled>
               Select type
             </option>
@@ -91,32 +101,61 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, balances }) => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <span className="block text-xs text-ink-500 mb-1.5">From</span>
-              <input className="input" type="date" name="startDate" required min={minDate} />
+              <input
+                className="input"
+                type="date"
+                value={startDate}
+                min={minDate}
+                required
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  if (endDate && e.target.value > endDate) setEndDate(e.target.value);
+                }}
+              />
             </div>
             <div>
               <span className="block text-xs text-ink-500 mb-1.5">To</span>
-              <input className="input" type="date" name="endDate" required min={minDate} />
+              <input
+                className="input"
+                type="date"
+                value={endDate}
+                min={startDate || minDate}
+                required
+                onChange={(e) => setEndDate(e.target.value)}
+              />
             </div>
           </div>
+
+          {days > 0 && (
+            <div className={`mt-2 text-sm ${overBalance ? "text-rose-600 font-medium" : "text-ink-600"}`}>
+              {overBalance
+                ? `${days} day(s) requested, but only ${remaining} ${type} day(s) remaining.`
+                : remaining != null
+                ? `${days} day(s) · ${remaining - days} ${type} day(s) remaining after request`
+                : `${days} day(s) selected`}
+            </div>
+          )}
+          {invalidRange && <div className="mt-2 text-sm text-rose-600 font-medium">End date is before start date.</div>}
         </div>
 
         <div>
           <label className="field-label">Reason</label>
           <textarea
             className="textarea"
-            name="reason"
+            value={reason}
             required
             rows={3}
             placeholder="Briefly describe why you need this leave..."
+            onChange={(e) => setReason(e.target.value)}
           />
         </div>
 
         <div className="flex gap-3 pt-2">
-          <Button variant="secondary" type="button" className="flex-1" onClick={onClose}>
+          <Button variant="secondary" type="button" className="flex-1" onClick={handleClose}>
             Cancel
           </Button>
-          <Button type="submit" loading={loading} className="flex-1">
-            {loading ? "Submitting..." : "Submit Request"}
+          <Button type="submit" loading={loading} className="flex-1" disabled={overBalance}>
+            {loading ? "Submitting..." : overBalance ? "Insufficient balance" : "Submit Request"}
           </Button>
         </div>
       </form>

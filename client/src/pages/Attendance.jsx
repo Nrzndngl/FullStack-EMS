@@ -3,6 +3,8 @@ import { CalendarX2, ChevronLeft, ChevronRight } from "lucide-react";
 import CheckInButton from "../components/attendance/CheckInButton";
 import AttendanceStats from "../components/attendance/AttendanceStats";
 import AttendanceHistory from "../components/attendance/AttendanceHistory";
+import AttendanceCalendar from "../components/attendance/AttendanceCalendar";
+import CorrectionRequestSection from "../components/attendance/CorrectionRequestSection";
 import AdminAttendanceTable from "../components/attendance/AdminAttendanceTable";
 import PageHeader from "../components/ui/PageHeader";
 import Badge from "../components/ui/Badge";
@@ -90,8 +92,9 @@ const Attendance = () => {
           )}
 
           <AttendanceStats history={history} />
+          <AttendanceCalendar />
 
-          <div className="flex items-center justify-between mb-4 mt-10">
+          <div className="flex items-center justify-between mb-4 mt-6">
             <h2 className="text-base font-semibold text-ink-900">Attendance History</h2>
             {!loading && <Badge tone="ink">{history.length} records</Badge>}
           </div>
@@ -129,6 +132,10 @@ const Attendance = () => {
               </button>
             </div>
           )}
+
+          <div className="mt-6">
+            <CorrectionRequestSection onRequestSent={fetchData} />
+          </div>
         </>
       ) : (
         <AdminAttendanceTable />

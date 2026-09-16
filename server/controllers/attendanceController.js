@@ -93,8 +93,14 @@ export const getAttendance = async (req, res) => {
         });
 
         const page = Math.max(1, parseInt(req.query.page) || 1);
-        const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 30));
+        const pageSize = Math.min(200, Math.max(1, parseInt(req.query.pageSize) || 30));
         const where = { employeeId: employee._id };
+
+        if (req.query.from || req.query.to) {
+            where.date = {};
+            if (req.query.from) where.date.$gte = dayRangeForDateKey(req.query.from).start;
+            if (req.query.to) where.date.$lte = dayRangeForDateKey(req.query.to).end;
+        }
         const [history, total] = await Promise.all([
             Attendance.find(where).sort({ date: -1 }).skip((page - 1) * pageSize).limit(pageSize),
             Attendance.countDocuments(where),
