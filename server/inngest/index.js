@@ -45,7 +45,7 @@ const autoCheckOut = inngest.createFunction(
 
             attendance = await Attendance.findById(attendanceId)
             if (!attendance?.checkOut) {
-                attendance.checkOut = new Date(attendance.checkIn).getTime() + 4 * 60 * 60 * 1000;
+                attendance.checkOut = new Date(new Date(attendance.checkIn).getTime() + 4 * 60 * 60 * 1000);
                 attendance.workingHours = 4;
                 attendance.dayType = "Half Day";
                 attendance.status = "LATE";
@@ -135,7 +135,7 @@ const attendanceReminderCron = inngest.createFunction(
 
         // Filter absent employees (not on leave & not checked in)
         const absentEmployees = activeEmployees.filter((emp) =>
-            !onLeaveIds.includes(emp._id) && !checkedInIds.includes(emp.id))
+            !onLeaveIds.includes(emp._id) && !checkedInIds.includes(emp._id))
 
         // Send reminder emails
         if (absentEmployees.length > 0) {

@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect } from "react"
 import Loading from "../components/Loading"
-import { PalmtreeIcon, Plus, ThermometerIcon, UmbrellaIcon } from "lucide-react"
+import { PalmtreeIcon, Plus, ThermometerIcon, UmbrellaIcon, ChevronLeft, ChevronRight } from "lucide-react"
 import LeaveHistory from "../components/leave/leaveHistory"
 import ApplyLeaveModal from "../components/leave/ApplyLeaveModal"
 import PageHeader from "../components/ui/PageHeader"
@@ -17,13 +17,16 @@ const Leave = () => {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [isDeleted, setIsDeleted] = useState(false)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const isAdmin = user?.role === "ADMIN"
 
   const fetchLeaves = useCallback(async () => {
     try {
-      const res = await api.get("/leaves")
+      const res = await api.get(`/leaves?page=${page}&pageSize=10`)
       setLeaves(res.data.data || [])
       setBalances(res.data.employee?.leaveBalance || null)
+      setTotalPages(res.data.totalPages || 1)
       if (res.data.employee?.isDeleted) {
         setIsDeleted(true);
       }
@@ -32,7 +35,7 @@ const Leave = () => {
     } finally {
       setLoading(false);
     }
-  }, [])
+  }, [page])
 
   useEffect(() => {
     fetchLeaves()
@@ -77,8 +80,31 @@ const Leave = () => {
         </div>
       )}
 
-      <LeaveHistory leaves={leaves} isAdmin={isAdmin} onUpdate={fetchLeaves} />
-      <ApplyLeaveModal open={showModal} onClose={() => setShowModal(false)} onSuccess={fetchLeaves} balances={balances} />
+      <LeaveHistory leaves={leaves} isAdmin={isAdmin} onUpdate={() => { setPage(1); fetchLeaves(); }} />
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="p-2 rounded-lg border border-ink-200 hover:bg-ink-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label="Previous page"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-sm text-ink-600 px-2">Page {page} of {totalPages}</span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="p-2 rounded-lg border border-ink-200 hover:bg-ink-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            aria-label="Next page"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      <ApplyLeaveModal open={showModal} onClose={() => setShowModal(false)} onSuccess={() => { setPage(1); fetchLeaves(); }} balances={balances} />
     </div>
   )
 }

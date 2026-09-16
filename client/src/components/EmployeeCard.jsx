@@ -1,4 +1,5 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, Eye } from "lucide-react";
+import { Link } from "react-router-dom";
 import api from "../api/axios";
 import toast from "react-hot-toast";
 import Avatar from "./ui/Avatar";
@@ -20,13 +21,19 @@ const EmployeeCard = ({ employee, onDelete, onEdit }) => {
   };
 
   return (
-    <div className="group card p-5 hover:shadow-md hover:shadow-ink-900/5 transition-shadow">
+    <Link
+      to={`/employees/${employeeId}`}
+      className="group card p-5 hover:shadow-md hover:shadow-ink-900/5 transition-shadow block"
+    >
       <div className="flex items-start justify-between mb-4">
-        <Avatar name={fullName} className="w-12 h-12 text-sm" />
+        <Avatar name={fullName} src={employee.image} className="w-12 h-12 text-sm" />
         <Badge tone={employee.isDeleted ? "ink" : "primary"}>{employee.department || "Remote"}</Badge>
       </div>
 
-      <h3 className="text-ink-900 font-semibold truncate">{fullName}</h3>
+      <h3 className="text-ink-900 font-semibold truncate group-hover:text-primary-700 transition-colors flex items-center gap-1.5">
+        {fullName}
+        {!employee.isDeleted && <Eye className="w-3.5 h-3.5 text-ink-300 group-hover:text-primary-500" />}
+      </h3>
       <p className="text-sm text-ink-500 truncate">{employee.position}</p>
 
       <div className="mt-5 pt-4 border-t border-ink-100 flex items-center justify-between">
@@ -36,14 +43,14 @@ const EmployeeCard = ({ employee, onDelete, onEdit }) => {
         {!employee.isDeleted && (
           <div className="flex gap-2">
             <button
-              onClick={() => onEdit?.(employee)}
+              onClick={(e) => { e.preventDefault(); onEdit?.(employee); }}
               aria-label={`Edit ${fullName}`}
               className="p-2 rounded-lg text-ink-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
             >
               <Pencil className="w-4 h-4" />
             </button>
             <button
-              onClick={handleDelete}
+              onClick={(e) => { e.preventDefault(); handleDelete(); }}
               aria-label={`Delete ${fullName}`}
               className="p-2 rounded-lg text-ink-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
             >
@@ -52,7 +59,7 @@ const EmployeeCard = ({ employee, onDelete, onEdit }) => {
           </div>
         )}
       </div>
-    </div>
+    </Link>
   );
 };
 

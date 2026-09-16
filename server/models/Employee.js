@@ -58,6 +58,10 @@ const employeeSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+    image: {
+        type: String,
+        default: ""
+    },
     department: {
         type: String,
         enum: DEPARTMENTS,

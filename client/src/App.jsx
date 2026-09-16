@@ -4,10 +4,14 @@ import LoginLanding from './pages/LoginLanding'
 import Layout from './pages/Layout'
 import Attendance from './pages/Attendance'
 import Employees from './pages/Employees'
+import EmployeeDetail from './pages/EmployeeDetail'
 import Leave from './pages/Leave'
 import Payslips from './pages/Payslips'
 import Setting from './pages/Setting'
 import PrintPayslip from './pages/PrintPayslip'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
+import AuditLog from './pages/AuditLog'
 import LoginForm from './components/LoginForm'
 import Dashboard from './pages/Dashboard'
 
@@ -21,15 +25,19 @@ const App = () => {
 
     <Route path='/login/admin' element={<LoginForm role="admin" title="Admin Portal" subtitle="Login to your admin account" />} />
       <Route path='/login/employee' element={<LoginForm role="employee" title="Employee Portal" subtitle="Login to your employee account" />} />
+      <Route path='/forgot-password' element={<ForgotPassword />} />
+      <Route path='/reset-password' element={<ResetPassword />} />
 
     
       <Route element = {<Layout />}>
         <Route path='/dashboard' element={<Dashboard />} />
         <Route path='/attendance' element={<Attendance />} />
         <Route path='/employees' element={<Employees />} />
+        <Route path='/employees/:id' element={<EmployeeDetail />} />
         <Route path='/leave' element={<Leave />} />
         <Route path='/payslips' element={<Payslips />} />
         <Route path='/setting' element={<Setting />} />
+        <Route path='/audit' element={<AuditLog />} />
       </Route>
       <Route path='/print/payslips/:id' element={<PrintPayslip />} />
 

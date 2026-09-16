@@ -28,6 +28,10 @@ const AttendanceSchema = new mongoose.Schema({
         default: null
 
     },
+    overtimeHours: {
+        type: Number,
+        default: 0
+    },
     dayType: {
         type: String,
         enum: ["Full Day", "Three Quarter Day", "Half Day", "Short Day", null],

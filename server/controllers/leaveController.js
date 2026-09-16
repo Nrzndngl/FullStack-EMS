@@ -1,9 +1,11 @@
 import { inngest } from "../inngest/index.js";
 import Employee from "../models/Employee.js";
+import User from "../models/User.js";
 import LeaveApplication from "../models/LeaveApplication.js";
 import { dayRangeForDateKey, daysBetweenNepalKeys, nepalDateKey } from "../utils/time.js";
 import { recordAudit } from "../utils/audit.js";
 import { sendLeaveDecisionEmail } from "../utils/notifications.js";
+import { notifyUser } from "./notificationController.js";
 
 // CREATE LEAVE
 export const createLeave = async (req, res) => {
@@ -67,6 +69,21 @@ export const createLeave = async (req, res) => {
             },
         })
 
+        // Notify admins about the new pending leave application
+        const admins = await User.find({ role: "ADMIN" }).select("_id").lean();
+        const adminIds = admins.map((a) => a._id.toString());
+        const employeeName = `${employee.firstName} ${employee.lastName}`;
+        await Promise.all(adminIds.map((adminId) =>
+            notifyUser({
+                userId: adminId,
+                title: "New leave application",
+                message: `${employeeName} applied for ${type} leave (${startKey} to ${endKey}).`,
+                type: "LEAVE",
+                link: "/leave",
+                entityId: leave._id,
+            })
+        ));
+
         return res.json({ success: true, data: leave })
     } catch (error) {
         return res.status(500).json({ error: "Failed to apply for leave" })
@@ -77,11 +94,16 @@ export const createLeave = async (req, res) => {
 export const getLeaves = async (req, res) => {
     try {
         const session = req.session;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 10));
         const isAdmin = session.role === "ADMIN";
         if (isAdmin) {
             const status = req.query.status;
             const where = status ? { status } : {};
-            const leaves = await LeaveApplication.find(where).populate("employeeId").sort({ startDate: -1 });
+            const [leaves, total] = await Promise.all([
+                LeaveApplication.find(where).populate("employeeId").sort({ startDate: -1 }).skip((page - 1) * pageSize).limit(pageSize),
+                LeaveApplication.countDocuments(where),
+            ]);
 
             const data = leaves.map((l) => {
                 const obj = l.toObject();
@@ -92,7 +114,7 @@ export const getLeaves = async (req, res) => {
                     employee: obj.employeeId,
                 }
             })
-            return res.json({ data: data });
+            return res.json({ data: data, page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
         } else {
             const employee = await Employee.findOne({
                 userId: session.userId,
@@ -100,12 +122,15 @@ export const getLeaves = async (req, res) => {
             if (!employee) return res.status(404).json({
                 error: "Not found"
             });
-            const leaves = await LeaveApplication.find({
-                employeeId: employee._id
-            }).sort({ createdAt: -1 });
+            const where = { employeeId: employee._id };
+            const [leaves, total] = await Promise.all([
+                LeaveApplication.find(where).sort({ createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize),
+                LeaveApplication.countDocuments(where),
+            ]);
             return res.json({
                 data: leaves,
-                employee: { ...employee, id: employee._id.toString() }
+                employee: { ...employee, id: employee._id.toString() },
+                page, pageSize, total, totalPages: Math.ceil(total / pageSize)
             })
         }
 
@@ -162,6 +187,18 @@ export const updateLeaveStatus = async (req, res) => {
                     endDate: nepalDateKey(leave.endDate),
                     reason: leave.reason,
                 });
+                // In-app notification for the employee
+                const linkedUser = await User.findOne({ email: employee.email }).select("_id").lean();
+                if (linkedUser) {
+                    await notifyUser({
+                        userId: linkedUser._id,
+                        title: `Leave ${status.toLowerCase()}`,
+                        message: `Your ${leave.type} leave (${nepalDateKey(leave.startDate)} to ${nepalDateKey(leave.endDate)}) was ${status.toLowerCase()}.`,
+                        type: "LEAVE",
+                        link: "/leave",
+                        entityId: leave._id,
+                    });
+                }
             }
         }
 

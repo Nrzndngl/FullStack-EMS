@@ -1,19 +1,28 @@
 import Employee from "../models/Employee.js";
 import bcrypt from "bcrypt"
 import User from "../models/User.js";
+import Attendance from "../models/Attendance.js";
+import LeaveApplication from "../models/LeaveApplication.js";
+import Payslip from "../models/Payslip.js";
 import { recordAudit } from "../utils/audit.js";
+import { nepalDateKey } from "../utils/time.js";
 
-
-// GET EMPLOYEE
+// GET EMPLOYEES (paginated, admin only)
 export const getEmployees = async (req, res) => {
     try {
         const { department } = req.query;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 12));
         const where = {};
         if (department) {
             where.department = department;
         }
-        const employees = await Employee.find(where).sort
-            ({ createdAt: -1 }).populate("userId", "email role").lean();
+
+        const [employees, total] = await Promise.all([
+            Employee.find(where).sort
+                ({ createdAt: -1 }).populate("userId", "email role").skip((page - 1) * pageSize).limit(pageSize).lean(),
+            Employee.countDocuments(where),
+        ]);
 
         const result = employees.map((emp) => ({
             ...emp,
@@ -21,10 +30,42 @@ export const getEmployees = async (req, res) => {
             user: emp.userId ? { email: emp.userId.email, role: emp.userId.role } : null
 
         }))
-        return res.json(result)
+        return res.json({ data: result, page, pageSize, total, totalPages: Math.ceil(total / pageSize) })
 
     } catch (error) {
         return res.status(500).json({ message: "internal server error" })
+    }
+}
+
+// GET SINGLE EMPLOYEE WITH SUMMARY (admin only)
+export const getEmployeeById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const employee = await Employee.findById(id).populate("userId", "email role").lean();
+        if (!employee) return res.status(404).json({ error: "Employee not found" });
+
+        const [attendanceCount, leaveCount, pendingLeaves, payslipCount, latestPayslip] = await Promise.all([
+            Attendance.countDocuments({ employeeId: employee._id }),
+            LeaveApplication.countDocuments({ employeeId: employee._id }),
+            LeaveApplication.countDocuments({ employeeId: employee._id, status: "PENDING" }),
+            Payslip.countDocuments({ employeeId: employee._id }),
+            Payslip.findOne({ employeeId: employee._id }).sort({ createdAt: -1 }).lean(),
+        ]);
+
+        return res.json({
+            ...employee,
+            id: employee._id.toString(),
+            user: employee.userId ? { email: employee.userId.email, role: employee.userId.role } : null,
+            attendanceCount,
+            leaveCount,
+            pendingLeaves,
+            payslipCount,
+            latestPayslip,
+            todayNepalDate: nepalDateKey(),
+        });
+
+    } catch (error) {
+        return res.status(500).json({ error: "Failed to fetch employee" })
     }
 }
 
@@ -32,7 +73,7 @@ export const getEmployees = async (req, res) => {
 
 export const createEmployee = async (req, res) => {
     try {
-        const { firstName, lastName, email, phone, department, position, basicSalary, allowances, deductions, joinDate, password, role, bio } = req.body;
+        const { firstName, lastName, email, phone, department, position, basicSalary, allowances, deductions, joinDate, password, role, bio, image } = req.body;
         //Validation
         if (!email || !password || !firstName || !lastName) {
             return res.status(400).json({ message: "email, password, first name, last name are required" });
@@ -58,7 +99,8 @@ export const createEmployee = async (req, res) => {
             allowances: Number(allowances) || 0,
             deductions: Number(deductions) || 0,
             joinDate: joinDate ? new Date(joinDate) : new Date(),
-            bio: bio || ""
+            bio: bio || "",
+            image: image || ""
         })
         res.status(201).json({ success: true, employee })
 
@@ -84,7 +126,7 @@ export const createEmployee = async (req, res) => {
 export const updateEmployee = async (req, res) => {
     try {
         const { id } = req.params;
-        const { firstName, lastName, email, phone, department, position, basicSalary, allowances, deductions, password, role, bio, employmentStatus } = req.body;
+        const { firstName, lastName, email, phone, department, position, basicSalary, allowances, deductions, password, role, bio, employmentStatus, image } = req.body;
         //Validation
         const employee = await Employee.findById(id)
         if (!employee) {
@@ -102,7 +144,8 @@ export const updateEmployee = async (req, res) => {
             allowances: Number(allowances) || 0,
             deductions: Number(deductions) || 0,
             employmentStatus: employmentStatus || "ACTIVE",
-            bio: bio || ""
+            bio: bio || "",
+            image: image || ""
         })
 
         //UPDATE USER RECORD

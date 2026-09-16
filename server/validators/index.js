@@ -18,6 +18,15 @@ export const changePasswordSchema = z.object({
     newPassword: z.string().min(8, "New password must be at least 8 characters"),
 });
 
+export const forgotPasswordSchema = z.object({
+    email: z.string().trim().email("A valid email is required"),
+});
+
+export const resetPasswordSchema = z.object({
+    token: z.string().min(1, "Reset token is required"),
+    newPassword: z.string().min(8, "New password must be at least 8 characters"),
+});
+
 // Employee
 const employeeBase = {
     firstName: z.string().trim().min(1, "First name is required"),
@@ -30,6 +39,7 @@ const employeeBase = {
     allowances: z.coerce.number().min(0).optional(),
     deductions: z.coerce.number().min(0).optional(),
     bio: z.string().trim().optional(),
+    image: z.string().optional(),
     employmentStatus: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     role: z.enum(["ADMIN", "EMPLOYEE"]).optional(),
 };
@@ -72,4 +82,5 @@ export const createPayslipSchema = z.object({
 // Profile
 export const updateProfileSchema = z.object({
     bio: z.string().trim().max(2000).optional(),
+    image: z.string().optional(),
 });

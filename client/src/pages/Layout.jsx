@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
+import NotificationBell from "../components/NotificationBell";
 import { useAuth } from "../context/AuthContext";
 import Loading from "../components/Loading";
 import { todayDisplay } from "../utils/format";
@@ -26,9 +27,12 @@ const Layout = () => {
           <p className="text-sm text-ink-500">
             Welcome back, <span className="font-medium text-ink-900">{name.split(" ")[0]}</span>
           </p>
-          <span className="text-xs text-ink-400">
-            {todayDisplay()}
-          </span>
+          <div className="flex items-center gap-5">
+            <NotificationBell />
+            <span className="text-xs text-ink-400">
+              {todayDisplay()}
+            </span>
+          </div>
         </header>
 
         {/* Mobile spacer for fixed top bar */}

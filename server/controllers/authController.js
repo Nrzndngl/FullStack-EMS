@@ -1,6 +1,8 @@
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
+import sendEmail from "../config/nodemailer.js";
 
 const ACCESS_TTL = "15m";
 const REFRESH_TTL = "7d";
@@ -114,5 +116,86 @@ export const changePassword = async (req, res) => {
 
     } catch (error) {
         return res.status(500).json({ error: "Change password failed" })
+    }
+}
+
+// FORGOT PASSWORD: EMAIL A ONE-TIME RESET TOKEN
+export const forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+        // Always respond the same way to avoid leaking which emails exist
+        if (!user) {
+            return res.json({ success: true, message: "If that email exists, a reset link has been sent." });
+        }
+
+        const token = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+        await User.findByIdAndUpdate(user._id, {
+            resetPasswordToken: token,
+            resetPasswordExpires: expiresAt,
+        });
+
+        const resetUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/reset-password?token=${token}`;
+
+        if (process.env.SMTP_USER && process.env.SMTP_PASS && process.env.SENDER_EMAIL) {
+            try {
+                await sendEmail({
+                    to: user.email,
+                    subject: "Reset your QuickEMS password",
+                    body: `
+                        <div style="max-width: 600px; font-family: Arial, sans-serif;">
+                            <h2>Password Reset Request</h2>
+                            <p>Hi ${user.name || "there"},</p>
+                            <p>We received a request to reset your QuickEMS password.</p>
+                            <p>Click the link below to set a new password. This link expires in 1 hour.</p>
+                            <p><a href="${resetUrl}" style="display:inline-block; padding:12px 24px; background:#4f46e5; color:#fff; text-decoration:none; border-radius:8px;">Reset Password</a></p>
+                            <p>If you didn't request this, you can safely ignore this email.</p>
+                            <br/>
+                            <p>Best Regards,<br/>QuickEMS Team</p>
+                        </div>
+                    `,
+                });
+            } catch (err) {
+                console.error("Forgot password email error:", err);
+                await User.findByIdAndUpdate(user._id, { resetPasswordToken: null, resetPasswordExpires: null });
+                return res.status(500).json({ error: "Failed to send reset email. Please try again." });
+            }
+        } else {
+            // Dev fallback when SMTP isn't configured: return the reset token directly
+            return res.json({ success: true, message: "Reset link generated.", devToken: token });
+        }
+
+        return res.json({ success: true, message: "If that email exists, a reset link has been sent." });
+    } catch (error) {
+        console.error("Forgot password error:", error);
+        return res.status(500).json({ error: "Failed to process request" });
+    }
+}
+
+// RESET PASSWORD WITH A VALID TOKEN
+export const resetPassword = async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: new Date() },
+        });
+        if (!user) {
+            return res.status(400).json({ error: "Invalid or expired reset token" });
+        }
+
+        const hashed = await bcrypt.hash(newPassword, 10);
+        await User.findByIdAndUpdate(user._id, {
+            password: hashed,
+            resetPasswordToken: null,
+            resetPasswordExpires: null,
+        });
+
+        return res.json({ success: true, message: "Password updated. You can now log in." });
+    } catch (error) {
+        console.error("Reset password error:", error);
+        return res.status(500).json({ error: "Failed to reset password" });
     }
 }

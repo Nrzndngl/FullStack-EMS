@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DEPARTMENTS } from "../assets/assets";
-import { UserPlus, UserCog } from "lucide-react";
+import { UserPlus, UserCog, Camera } from "lucide-react";
 import api from "../api/axios";
 import toast from "react-hot-toast";
 import Button from "./ui/Button";
+import Avatar from "./ui/Avatar";
 
 const Field = ({ label, required, children, className = "", colSpan }) => (
   <div className={`${colSpan ? "sm:col-span-2" : ""} ${className}`}>
@@ -28,12 +29,31 @@ const Section = ({ icon: Icon, title, children }) => (
 const EmployeeForm = ({ initialData, onSucess, onCancel }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [pendingImage, setPendingImage] = useState(null);
   const isEditMode = !!initialData;
+  const fullName = `${initialData?.firstName || ""} ${initialData?.lastName || ""}`.trim() || "New Employee";
+
+  const handleFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please choose an image file");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Image must be under 2MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setPendingImage(reader.result);
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     const formData = new FormData(e.currentTarget);
+    if (pendingImage) formData.append("image", pendingImage);
     if (isEditMode) {
       const pwd = formData.get("password");
       if (!pwd) formData.delete("password");
@@ -59,6 +79,17 @@ const EmployeeForm = ({ initialData, onSucess, onCancel }) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <Section icon={UserPlus} title="Personal Information">
+        <div className="sm:col-span-2 flex items-center gap-4">
+          <Avatar name={fullName} src={pendingImage || initialData?.image} className="w-16 h-16 text-base" />
+          <div>
+            <label className="btn-secondary cursor-pointer inline-flex items-center gap-2">
+              <Camera className="w-4 h-4" />
+              {pendingImage ? "Change photo" : "Upload photo"}
+              <input type="file" accept="image/*" className="sr-only" onChange={handleFile} />
+            </label>
+            <p className="text-xs text-ink-400 mt-1.5">PNG or JPG, max 2MB.</p>
+          </div>
+        </div>
         <Field label="First Name" required>
           <input className="input" name="firstName" required defaultValue={initialData?.firstName} />
         </Field>

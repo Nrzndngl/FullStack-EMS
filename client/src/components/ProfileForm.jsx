@@ -1,20 +1,45 @@
-import { Save, User } from 'lucide-react'
+import { Save, User, Camera } from 'lucide-react'
 import { useState } from 'react'
 import api from '../api/axios'
 import Button from './ui/Button'
+import Avatar from './ui/Avatar'
 
 const ProfileForm = ({ initialData, onSuccess }) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
+  const [image, setImage] = useState(initialData.image || "")
+  const [pendingImage, setPendingImage] = useState(null)
+
+  const fullName = `${initialData.firstName || "Admin"} ${initialData.lastName || ""}`.trim()
+
+  const handleFile = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose an image file")
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Image must be under 2MB")
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => setPendingImage(reader.result)
+    reader.readAsDataURL(file)
+    setError("")
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setMessage("");
     const formData = new FormData(e.currentTarget)
+    if (pendingImage) formData.append("image", pendingImage)
     try {
       await api.put("/profile", formData)
+      if (pendingImage) setImage(pendingImage)
+      setPendingImage(null)
       setMessage("Profile updated successfully!")
       onSuccess?.()
     } catch (error) {
@@ -24,6 +49,8 @@ const ProfileForm = ({ initialData, onSuccess }) => {
     }
   }
 
+  const displayImage = pendingImage || image
+
   return (
     <form onSubmit={handleSubmit} className='card p-5 sm:p-6 mb-6'>
       <h2 className="text-base font-medium text-ink-900 mb-6 pb-4 border-b border-ink-100 flex items-center gap-2">
@@ -31,23 +58,39 @@ const ProfileForm = ({ initialData, onSuccess }) => {
         Public Profile
       </h2>
       {error && (
-        <div className="bg-rose-50 text-rose-700 p-4 rounded-xl text-sm border border-rose-200 mb-6 flex items-start gap-3">
-          <div className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+        <div className="bg-rose-50 text-rose-700 p-4 rounded-xl text-sm border border-rose-200 mb-6 items-start gap-3">
           {error}
         </div>
       )}
       {message && (
-        <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-sm border border-emerald-200 mb-6 flex items-start gap-3">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 shrink-0" />
+        <div className="bg-emerald-50 text-emerald-700 p-4 rounded-xl text-sm border border-emerald-200 mb-6">
           {message}
         </div>
       )}
 
       <div className="space-y-5">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="sm:col-span-2 flex items-center gap-4">
+            <Avatar name={fullName} src={displayImage} className="w-20 h-20 text-lg" />
+            <div>
+              <label className="btn-secondary cursor-pointer inline-flex items-center gap-2">
+                <Camera className="w-4 h-4" />
+                {pendingImage ? "Change photo" : "Upload photo"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={handleFile}
+                  disabled={initialData.isDeleted}
+                />
+              </label>
+              <p className="text-xs text-ink-400 mt-1.5">PNG or JPG, max 2MB.</p>
+            </div>
+          </div>
+
           <div>
             <label className='field-label'>Name</label>
-            <input disabled value={`${initialData.firstName} ${initialData.lastName}`} className='input bg-ink-50 text-ink-400 cursor-not-allowed' />
+            <input disabled value={fullName} className='input bg-ink-50 text-ink-400 cursor-not-allowed' />
           </div>
 
           <div>

@@ -10,9 +10,11 @@ import {
   MenuIcon,
   XIcon,
   DollarSignIcon,
+  ScrollTextIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Avatar from "./ui/Avatar";
+import NotificationBell from "./NotificationBell";
 
 const Sidebar = ({ userName, mobileOpen, setMobileOpen }) => {
   const { pathname } = useLocation();
@@ -27,6 +29,7 @@ const Sidebar = ({ userName, mobileOpen, setMobileOpen }) => {
       : { name: "Attendance", href: "/attendance", icon: CalendarIcon },
     { name: "Leave", href: "/leave", icon: FileTextIcon },
     { name: "Payslips", href: "/payslips", icon: DollarSignIcon },
+    ...(role === "ADMIN" ? [{ name: "Audit Log", href: "/audit", icon: ScrollTextIcon }] : []),
   ];
 
   const primaryItems = navItems.filter((i) => i.href !== "/setting");
@@ -130,6 +133,9 @@ const Sidebar = ({ userName, mobileOpen, setMobileOpen }) => {
           <MenuIcon size={22} />
         </button>
         <span className="ml-2 text-sm font-semibold text-ink-900">QuickEMS</span>
+        <div className="ml-auto">
+          <NotificationBell />
+        </div>
       </div>
 
       {/* Mobile drawer */}
