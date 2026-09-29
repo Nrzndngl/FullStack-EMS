@@ -1,5 +1,13 @@
 import Announcement from "../models/Announcement.js";
 import { recordAudit } from "../utils/audit.js";
+import mongoose from "mongoose";
+
+const validId = (id) => {
+    if (!id || id === "undefined" || !mongoose.isValidObjectId(id)) {
+        return { error: "A valid announcement ID is required." };
+    }
+    return null;
+};
 
 // PUBLIC FEED — newest first, pinned announcements always on top (employees + admins)
 export const getAnnouncements = async (req, res) => {
@@ -81,6 +89,9 @@ export const createAnnouncement = async (req, res) => {
 export const updateAnnouncement = async (req, res) => {
     try {
         const { id } = req.params;
+        const invalid = validId(id);
+        if (invalid) return res.status(400).json(invalid);
+
         const announcement = await Announcement.findById(id);
         if (!announcement) return res.status(404).json({ error: "Announcement not found" });
 
@@ -108,6 +119,9 @@ export const updateAnnouncement = async (req, res) => {
 export const deleteAnnouncement = async (req, res) => {
     try {
         const { id } = req.params;
+        const invalid = validId(id);
+        if (invalid) return res.status(400).json(invalid);
+
         const announcement = await Announcement.findByIdAndDelete(id);
         if (!announcement) return res.status(404).json({ error: "Announcement not found" });
 
