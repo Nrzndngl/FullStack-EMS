@@ -218,24 +218,28 @@ const EmployeeDashboard = ({ data }) => {
           </h3>
           <div className="mt-4 space-y-4">
             {announcements.map((a) => (
-              <div key={a.id} className="flex gap-4">
+              <Link
+                key={a.id}
+                to={`/announcements/${a.id}`}
+                className="flex gap-4 group rounded-xl -mx-2 px-2 py-1 transition-colors hover:bg-ink-50"
+              >
                 <span className="w-9 h-9 rounded-xl bg-primary-50 text-primary-600 flex items-center justify-center shrink-0">
                   <PartyPopper className="w-4.5 h-4.5" />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-ink-900 flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-ink-900 flex items-center gap-2 flex-wrap group-hover:text-primary-700 transition-colors">
                     {a.title}
                     {a.pinned && (
                       <span className="badge badge-primary !text-[10px]">Pinned</span>
                     )}
                   </p>
-                  <p className="text-sm text-ink-600 mt-0.5 whitespace-pre-wrap">{a.body}</p>
+                  <p className="text-sm text-ink-600 mt-0.5 line-clamp-2 whitespace-pre-wrap">{a.body}</p>
                   <p className="text-xs text-ink-400 mt-1">
                     {a.author?.name || a.author?.email || "Admin"} ·{" "}
-                    {new Date(a.createdAt).toLocaleDateString()}
+                    {new Date(a.createdAt).toLocaleDateString()} · View →
                   </p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </Card>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Megaphone, Plus, Pin, Trash2, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "../api/axios.js";
 import toast from "react-hot-toast";
@@ -97,14 +98,16 @@ const Announcements = () => {
             <div key={a.id} className="card p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="font-semibold text-ink-900 flex items-center gap-2 flex-wrap">
-                    {a.title}
-                    {a.pinned && <Badge tone="primary"><Pin className="w-3 h-3" /> Pinned</Badge>}
-                  </p>
-                  <p className="text-sm text-ink-600 mt-1 whitespace-pre-wrap">{a.body}</p>
+                  <Link to={`/announcements/${a.id}`} className="group">
+                    <p className="font-semibold text-ink-900 flex items-center gap-2 flex-wrap group-hover:text-primary-700 transition-colors">
+                      {a.title}
+                      {a.pinned && <Badge tone="primary"><Pin className="w-3 h-3" /> Pinned</Badge>}
+                    </p>
+                  </Link>
+                  <p className="text-sm text-ink-600 mt-1 line-clamp-2 whitespace-pre-wrap">{a.body}</p>
                   <p className="text-xs text-ink-400 mt-2">
                     {a.author?.name || a.author?.email || "Admin"} ·{" "}
-                    {new Date(a.createdAt).toLocaleDateString()}
+                    {new Date(a.createdAt).toLocaleDateString()} · <Link to={`/announcements/${a.id}`} className="text-primary-600 hover:underline">View →</Link>
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

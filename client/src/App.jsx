@@ -13,6 +13,7 @@ import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import AuditLog from './pages/AuditLog'
 import Announcements from './pages/Announcements'
+import AnnouncementDetail from './pages/AnnouncementDetail'
 import LoginForm from './components/LoginForm'
 import Dashboard from './pages/Dashboard'
 
@@ -40,6 +41,7 @@ const App = () => {
         <Route path='/setting' element={<Setting />} />
         <Route path='/audit' element={<AuditLog />} />
         <Route path='/announcements' element={<Announcements />} />
+        <Route path='/announcements/:id' element={<AnnouncementDetail />} />
       </Route>
       <Route path='/print/payslips/:id' element={<PrintPayslip />} />
 

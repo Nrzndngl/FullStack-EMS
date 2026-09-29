@@ -58,6 +58,28 @@ export const getAllAnnouncements = async (req, res) => {
     }
 };
 
+// GET A SINGLE ANNOUNCEMENT BY ID (all authenticated users)
+export const getAnnouncementById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const invalid = validId(id);
+        if (invalid) return res.status(400).json(invalid);
+
+        const announcement = await Announcement.findById(id)
+            .populate("authorId", "name email")
+            .lean();
+        if (!announcement) return res.status(404).json({ error: "Announcement not found" });
+
+        return res.json({
+            ...announcement,
+            id: announcement._id.toString(),
+            author: announcement.authorId,
+        });
+    } catch (error) {
+        return res.status(500).json({ error: "Failed to fetch announcement" });
+    }
+};
+
 // ADMIN: CREATE
 export const createAnnouncement = async (req, res) => {
     try {
@@ -77,7 +99,7 @@ export const createAnnouncement = async (req, res) => {
         // announcement appears in the header bell.
         const author = await User.findById(req.session.userId).select("name email").lean();
         const authorName = author?.name || author?.email || "Admin";
-        const users = await User.find({ _id: { $ne: req.session.userId } }).select("_id role").lean();
+        const users = await User.find({ _id: { $ne: req.session.userId } }).select("_id").lean();
         const message = `${authorName}: ${announcement.body.trim().slice(0, 120)}${announcement.body.trim().length > 120 ? "…" : ""}`;
         await Promise.all(users.map((u) =>
             notifyUser({
@@ -85,7 +107,7 @@ export const createAnnouncement = async (req, res) => {
                 title: `New announcement: ${announcement.title}`,
                 message,
                 type: "ANNOUNCEMENT",
-                link: u.role === "ADMIN" ? "/announcements" : "/dashboard",
+                link: `/announcements/${announcement._id}`,
                 entityId: announcement._id,
             })
         ));
