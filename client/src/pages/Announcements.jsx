@@ -42,7 +42,7 @@ const Announcements = () => {
       pinned: fd.get("pinned") === "on",
     };
     try {
-      if (editing) {
+      if (editing?.id) {
         await api.put(`/announcements/${editing.id}`, body);
         toast.success("Announcement updated");
       } else {
