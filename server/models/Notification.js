@@ -16,7 +16,7 @@ const notificationSchema = new mongoose.Schema({
     },
     type: {
         type: String,
-        enum: ["LEAVE", "PAYSLIP", "ATTENDANCE", "EMPLOYEE", "SYSTEM"],
+        enum: ["LEAVE", "PAYSLIP", "ATTENDANCE", "EMPLOYEE", "SYSTEM", "ANNOUNCEMENT"],
         default: "SYSTEM",
     },
     read: {
