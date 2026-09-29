@@ -1,5 +1,7 @@
 import Announcement from "../models/Announcement.js";
+import User from "../models/User.js";
 import { recordAudit } from "../utils/audit.js";
+import { notifyUser } from "./notificationController.js";
 import mongoose from "mongoose";
 
 const validId = (id) => {
@@ -70,6 +72,23 @@ export const createAnnouncement = async (req, res) => {
             pinned: Boolean(pinned),
             authorId: req.session.userId,
         });
+
+        // Push a notification to every user (except the author) so the
+        // announcement appears in the header bell.
+        const author = await User.findById(req.session.userId).select("name email").lean();
+        const authorName = author?.name || author?.email || "Admin";
+        const users = await User.find({ _id: { $ne: req.session.userId } }).select("_id role").lean();
+        const message = `${authorName}: ${announcement.body.trim().slice(0, 120)}${announcement.body.trim().length > 120 ? "…" : ""}`;
+        await Promise.all(users.map((u) =>
+            notifyUser({
+                userId: u._id,
+                title: `New announcement: ${announcement.title}`,
+                message,
+                type: "ANNOUNCEMENT",
+                link: u.role === "ADMIN" ? "/announcements" : "/dashboard",
+                entityId: announcement._id,
+            })
+        ));
 
         await recordAudit({
             actorId: req.session.userId,
