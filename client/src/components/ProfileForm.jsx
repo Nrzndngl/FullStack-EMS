@@ -3,8 +3,10 @@ import { useState } from 'react'
 import api from '../api/axios'
 import Button from './ui/Button'
 import Avatar from './ui/Avatar'
+import { useAuth } from '../context/AuthContext'
 
 const ProfileForm = ({ initialData, onSuccess }) => {
+  const { refreshSession } = useAuth()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
@@ -38,6 +40,7 @@ const ProfileForm = ({ initialData, onSuccess }) => {
     if (pendingImage) formData.append("image", pendingImage)
     try {
       await api.put("/profile", formData)
+      refreshSession()
       if (pendingImage) setImage(pendingImage)
       setPendingImage(null)
       setMessage("Profile updated successfully!")

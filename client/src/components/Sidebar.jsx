@@ -97,7 +97,7 @@ const Sidebar = ({ userName, mobileOpen, setMobileOpen }) => {
 
       {userName && (
         <div className="mx-3 mt-4 mb-2 p-3 rounded-xl bg-ink-50 border border-ink-100 flex items-center gap-3">
-          <Avatar name={userName} />
+          <Avatar name={userName} src={user?.photo || ""} />
           <div className="min-w-0">
             <p className="text-sm font-medium text-ink-900 truncate">{userName}</p>
             <p className="text-xs text-ink-400 truncate">{role === "ADMIN" ? "Administrator" : "Employee"}</p>
