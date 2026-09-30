@@ -11,16 +11,12 @@ const REFRESH_MS = 7 * 24 * 60 * 60 * 1000;
 
 const refreshSecret = () => process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET;
 
-const buildPayload = async (user) => {
-    const employee = await Employee.findOne({ userId: user._id }).select("image").lean();
-    return {
-        userId: user._id.toString(),
-        role: user.role,
-        email: user.email,
-        name: user.name || "",
-        photo: employee?.image || "",
-    };
-};
+const buildPayload = (user) => ({
+    userId: user._id.toString(),
+    role: user.role,
+    email: user.email,
+    name: user.name || "",
+});
 
 const refreshCookieOptions = () => ({
     httpOnly: true,
@@ -51,7 +47,7 @@ export const login = async (req, res) => {
             return res.status(401).json({ error: "Invalid Credentials" });
         }
 
-        const payload = await buildPayload(user);
+        const payload = buildPayload(user);
         const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: ACCESS_TTL });
         const refreshToken = jwt.sign({ userId: user._id.toString() }, refreshSecret(), { expiresIn: REFRESH_TTL });
 
@@ -79,7 +75,7 @@ export const refresh = async (req, res) => {
         const user = await User.findById(payload.userId);
         if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-        const session = await buildPayload(user);
+        const session = buildPayload(user);
         const accessToken = jwt.sign(session, process.env.JWT_SECRET, { expiresIn: ACCESS_TTL });
         // Rotate the refresh token
         const refreshToken = jwt.sign({ userId: user._id.toString() }, refreshSecret(), { expiresIn: REFRESH_TTL });
