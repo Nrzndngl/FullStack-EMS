@@ -7,9 +7,15 @@ const api = axios.create({
 
 // Attach access token to all network requests
 api.interceptors.request.use((config) => {
-    const token = localStorage.getItem("token")
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`
+    const raw = localStorage.getItem("token")
+    if (raw && raw.length > 4096) {
+        // Drop oversized tokens (legacy tokens that embedded a base64 photo).
+        // Sending them exceeds edge request-header limits (HTTP 494) and
+        // breaks every authenticated call; the refresh flow will mint a
+        // valid small token from the refresh cookie.
+        localStorage.removeItem("token")
+    } else if (raw) {
+        config.headers.Authorization = `Bearer ${raw}`
     }
     return config;
 })
