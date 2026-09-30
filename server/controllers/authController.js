@@ -98,9 +98,10 @@ export const logout = (req, res) => {
 }
 
 // GET SESSION FOR EMPLOYEE AND ADMIN
-export const session = (req, res) => {
+export const session = async (req, res) => {
     const session = req.session;
-    return res.json({ user: session })
+    const employee = await Employee.findOne({ userId: session.userId }).select("image").lean();
+    return res.json({ user: { ...session, photo: employee?.image || "" } });
 }
 
 // CHANGE PASSWORD FOR EMPLOYEE AND ADMIN
