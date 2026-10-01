@@ -20,8 +20,11 @@ const parseTime = (value, label) => {
 export const clockInOut = async (req, res) => {
     try {
         const session = req.session;
+        if (session.role === "ADMIN") {
+            return res.status(400).json({ error: "Admins have no personal attendance record. Use GET /api/attendance/all." })
+        }
         const employee = await Employee.findOne({ userId: session.userId })
-        if (!employee) return res.status(404).json({ error: "Employee not found" })
+        if (!employee) return res.status(404).json({ error: "No employee profile is linked to this account. Contact an administrator." })
         if (employee.isDeleted) return res.status(403).json({ error: "Account is deactivated" })
 
         const today = startOfNepalDay();
@@ -97,12 +100,15 @@ export const clockInOut = async (req, res) => {
 export const getAttendance = async (req, res) => {
     try {
         const session = req.session;
+        if (session.role === "ADMIN") {
+            return res.status(400).json({ error: "Admins have no personal attendance record. Use GET /api/attendance/all." })
+        }
         const employee = await Employee.findOne({
             userId: session.userId
         })
         if (!employee) return res.status(404).json({
             error:
-                "Employee not found"
+                "No employee profile is linked to this account. Contact an administrator."
         });
 
         const page = Math.max(1, parseInt(req.query.page) || 1);
