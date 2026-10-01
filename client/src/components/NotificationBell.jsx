@@ -60,9 +60,19 @@ const NotificationBell = () => {
   return (
     <div className="relative" ref={dropRef}>
       <button
+        type="button"
         onClick={() => setOpen((o) => !o)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setOpen((o) => !o);
+          }
+        }}
         className="relative p-2 rounded-lg hover:bg-ink-100 text-ink-600 transition-colors"
-        aria-label="Notifications"
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        role="button"
       >
         {unread > 0 ? <BellRing className="w-[18px] h-[18px]" /> : <Bell className="w-[18px] h-[18px]" />}
         {unread > 0 && (
@@ -78,7 +88,9 @@ const NotificationBell = () => {
             <h3 className="text-sm font-semibold text-ink-900">Notifications</h3>
             {unread > 0 && (
               <button
+                type="button"
                 onClick={markAllRead}
+                aria-label="Mark all notifications as read"
                 className="inline-flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 font-medium"
               >
                 <CheckCheck className="w-3.5 h-3.5" />

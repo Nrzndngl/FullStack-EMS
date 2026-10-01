@@ -1,11 +1,28 @@
+import { useCallback, useEffect, useState } from "react";
 import { CalendarCheck, AlertCircle, Clock } from "lucide-react";
+import api from "../../api/axios";
 import StatCard from "../ui/StatCard";
 
-const AttendanceStats = ({ history }) => {
-  const totalPresent = history.filter((h) => h.status === "PRESENT" || h.status === "LATE").length;
-  const totalLate = history.filter((h) => h.status === "LATE").length;
+const AttendanceStats = () => {
+  const [records, setRecords] = useState([]);
 
-  const hours = history
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await api.get("/attendance?page=1&pageSize=200");
+      setRecords(res.data?.data || []);
+    } catch {
+      setRecords([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  const totalPresent = records.filter((h) => h.status === "PRESENT" || h.status === "LATE").length;
+  const totalLate = records.filter((h) => h.status === "LATE").length;
+
+  const hours = records
     .map((h) => Number(h.workingHours))
     .filter((n) => !isNaN(n) && n > 0);
   const avgHours =
@@ -15,7 +32,7 @@ const AttendanceStats = ({ history }) => {
 
   const stats = [
     { icon: CalendarCheck, value: totalPresent, label: "Days Present", hint: "Present or late", tone: "primary" },
-    { icon: AlertCircle, value: totalLate, label: "Late Arrivals", hint: "This period", tone: "warning" },
+    { icon: AlertCircle, value: totalLate, label: "Late Arrivals", hint: "All recorded days", tone: "warning" },
     { icon: Clock, value: `${avgHours} hrs`, label: "Avg. Work Hours", hint: "Per recorded day", tone: "ink" },
   ];
 

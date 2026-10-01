@@ -13,6 +13,8 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
   const [processing, setProcessing] = useState(null);
 
   const handleStatusUpdate = async (id, status) => {
+    const verb = status === "APPROVED" ? "Approve" : "Reject";
+    if (!window.confirm(`${verb} this leave request?`)) return;
     setProcessing(id);
     try {
       await api.patch(`/leaves/${id}`, { status });
@@ -84,7 +86,7 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
                           <div className="flex justify-center gap-2">
                             <button
                               onClick={() => handleStatusUpdate(id, "APPROVED")}
-                              disabled={!!processing}
+                              disabled={processing === id}
                               aria-label="Approve"
                               className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                             >
@@ -96,7 +98,7 @@ const LeaveHistory = ({ leaves, isAdmin, onUpdate }) => {
                             </button>
                             <button
                               onClick={() => handleStatusUpdate(id, "REJECTED")}
-                              disabled={!!processing}
+                              disabled={processing === id}
                               aria-label="Reject"
                               className="p-2 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors disabled:opacity-50"
                             >

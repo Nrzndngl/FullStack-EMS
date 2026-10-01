@@ -1,4 +1,5 @@
 import Attendance from "../models/Attendance.js";
+import mongoose from "mongoose";
 import Employee from "../models/Employee.js";
 import User from "../models/User.js";
 import AttendanceCorrection from "../models/AttendanceCorrection.js";
@@ -12,9 +13,10 @@ const STATUS_LABEL = {
 };
 
 const recomputeHours = (record) => {
-    if (record.checkIn && record.checkOut) {
-        const diffMs = new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime();
-        const hours = Math.max(0, diffMs / (1000 * 60 * 60));
+    const start = record.checkIn ? new Date(record.checkIn).getTime() : null;
+    const end = record.checkOut ? new Date(record.checkOut).getTime() : null;
+    if (start != null && end != null && !Number.isNaN(start) && !Number.isNaN(end)) {
+        const hours = Math.min(24, Math.max(0, (end - start) / (1000 * 60 * 60)));
         record.workingHours = parseFloat(hours.toFixed(2));
         const STANDARD_HOURS = 8;
         record.overtimeHours = record.workingHours > STANDARD_HOURS
@@ -39,8 +41,20 @@ export const createCorrectionRequest = async (req, res) => {
             return res.status(400).json({ error: "Date and reason are required" });
         }
 
+        // Reject invalid dates/times instead of persisting Invalid Date objects
+        const parsedDate = new Date(date);
+        if (Number.isNaN(parsedDate.getTime())) {
+            return res.status(400).json({ error: "Invalid date" });
+        }
+        for (const [value, label] of [[checkIn, "checkIn"], [checkOut, "checkOut"]]) {
+            if (value !== undefined && value !== null && value !== "") {
+                const t = new Date(value);
+                if (Number.isNaN(t.getTime())) return res.status(400).json({ error: `Invalid ${label}` });
+            }
+        }
+
         // Normalize to a Nepal calendar date; only past days can be corrected
-        const dateKey = nepalDateKey(new Date(date));
+        const dateKey = nepalDateKey(parsedDate);
         if (dateKey >= nepalDateKey()) {
             return res.status(400).json({ error: "You can only request corrections for past days" });
         }
@@ -68,7 +82,7 @@ export const createCorrectionRequest = async (req, res) => {
 
         const request = await AttendanceCorrection.create({
             employeeId: employee._id,
-            date: startOfNepalDay(new Date(date)),
+            date: startOfNepalDay(parsedDate),
             checkIn: checkIn ? new Date(checkIn) : null,
             checkOut: checkOut ? new Date(checkOut) : null,
             reason: reason.trim(),
@@ -151,6 +165,10 @@ export const reviewCorrectionRequest = async (req, res) => {
     try {
         const { id } = req.params;
         const { status, adminNote } = req.body;
+
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ error: "Invalid correction request id" });
+        }
 
         const request = await AttendanceCorrection.findById(id).populate("employeeId");
         if (!request) return res.status(404).json({ error: "Correction request not found" });

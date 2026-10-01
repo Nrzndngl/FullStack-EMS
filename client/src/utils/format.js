@@ -5,6 +5,55 @@ const TZ = "Asia/Kathmandu";
 const dateFmt = (opts) =>
   new Intl.DateTimeFormat("en-GB", { timeZone: TZ, ...opts });
 
+const toDate = (value) =>
+  typeof value === "string" || typeof value === "number" ? new Date(value) : value;
+
+const nepalYMD = (value = new Date()) => {
+  const date = toDate(value);
+  if (!date || isNaN(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (type) => Number(parts.find((p) => p.type === type)?.value);
+  const year = get("year");
+  const month = get("month");
+  const day = get("day");
+  if (!year || !month || !day) return null;
+  return { year, month, day };
+};
+
+export function nepalDateParts(value) {
+  return nepalYMD(value);
+}
+
+export function nepalDateKey(value = new Date()) {
+  const parts = nepalYMD(value);
+  if (!parts) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
+}
+
+export function todayNepalKey() {
+  return nepalDateKey(new Date());
+}
+
+export function dateFromNepalKey(key) {
+  if (!key) return null;
+  const date = new Date(`${key}T00:00:00+05:45`);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+export function shiftNepalKey(key, days) {
+  const parts = nepalYMD(dateFromNepalKey(key));
+  if (!parts) return key;
+  const shifted = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
+}
+
 export function formatNepalDate(value, opts = {}) {
   if (!value) return "—";
   const date = typeof value === "string" || typeof value === "number" ? new Date(value) : value;
@@ -51,10 +100,15 @@ export const setCalendarPref = (enabled) => window.localStorage.setItem("calenda
 
 export function formatBSDate(value) {
   if (!value) return "—";
-  const date = typeof value === "string" || typeof value === "number" ? new Date(value) : value;
-  if (isNaN(date.getTime())) return "—";
-  const { year, month, day } = adToBs(date.getFullYear(), date.getMonth() + 1, date.getDate());
-  return `${BS_MONTHS[month - 1]} ${day}, ${year} BS`;
+  const parts = nepalYMD(value);
+  if (!parts) return "—";
+  let bs;
+  try {
+    bs = adToBs(parts.year, parts.month, parts.day);
+  } catch {
+    return "—";
+  }
+  return `${BS_MONTHS[bs.month - 1]} ${bs.day}, ${bs.year} BS`;
 }
 
 export function formatDisplayDate(value) {

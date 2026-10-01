@@ -10,7 +10,7 @@ const employeeName = (emp) =>
 // GET /api/reports/attendance.csv?limit=500 — ADMIN
 export const exportAttendanceCsv = async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit || 500, 10);
+        const limit = Math.min(5000, Math.max(1, parseInt(req.query.limit || 500, 10) || 500));
         const records = await Attendance.find()
             .populate("employeeId", "firstName lastName email department")
             .sort({ date: -1 })
@@ -48,7 +48,7 @@ export const exportAttendanceCsv = async (req, res) => {
 // GET /api/reports/payroll.csv?limit=500 — ADMIN
 export const exportPayrollCsv = async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit || 500, 10);
+        const limit = Math.min(5000, Math.max(1, parseInt(req.query.limit || 500, 10) || 500));
         const payslips = await Payslip.find()
             .populate("employeeId", "firstName lastName email department")
             .sort({ year: -1, month: -1 })

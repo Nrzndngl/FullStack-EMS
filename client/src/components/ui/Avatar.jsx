@@ -1,4 +1,12 @@
+import { useEffect, useState } from "react";
+
 const Avatar = ({ name = "", src = "", className = "w-9 h-9 text-xs", tone = "primary" }) => {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
+
   const initials = (name || "?")
     .split(" ")
     .filter(Boolean)
@@ -12,11 +20,12 @@ const Avatar = ({ name = "", src = "", className = "w-9 h-9 text-xs", tone = "pr
       ? "bg-primary-100 text-primary-700"
       : "bg-ink-100 text-ink-600";
 
-  if (src) {
+  if (src && !failed) {
     return (
       <img
         src={src}
         alt={name || "avatar"}
+        onError={() => setFailed(true)}
         className={`rounded-full object-cover shrink-0 ${className}`}
       />
     );

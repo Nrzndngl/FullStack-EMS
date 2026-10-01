@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ScrollText, ChevronLeft, ChevronRight } from "lucide-react";
+import { ScrollText, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import PageHeader from "../components/ui/PageHeader";
 import EmptyState from "../components/ui/EmptyState";
 import Card from "../components/ui/Card";
@@ -11,7 +11,25 @@ const ENTITY_COLORS = {
   LEAVE: "warning",
   PAYSLIP: "success",
   ATTENDANCE: "ink",
+  ANNOUNCEMENT: "primary",
+  ATTENDANCE_CORRECTION: "warning",
 };
+
+const ACTION_COLORS = {
+  CREATE: "success",
+  UPDATE: "primary",
+  DELETE: "danger",
+  LEAVE_STATUS: "warning",
+  ATTENDANCE_CORRECT: "primary",
+  ATTENDANCE_CORRECTION_REVIEW: "warning",
+  ANNOUNCEMENT_CREATE: "success",
+  ANNOUNCEMENT_UPDATE: "primary",
+  ANNOUNCEMENT_DELETE: "danger",
+  PAYSLIP_CREATE: "success",
+  PAYSLIP_BATCH: "primary",
+};
+
+const actionTone = (action) => ACTION_COLORS[action] || "ink";
 
 const formatTime = (iso) => {
   const d = new Date(iso);
@@ -27,6 +45,7 @@ const formatTime = (iso) => {
 const AuditLog = () => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -35,12 +54,16 @@ const AuditLog = () => {
   const fetchLogs = useCallback(async () => {
     try {
       setLoading(true);
+      setError("");
       const res = await api.get(`/audit?page=${page}&pageSize=${pageSize}`);
       setLogs(res.data?.data || []);
       setTotal(res.data?.total || 0);
       setTotalPages(res.data?.totalPages || 1);
-    } catch (error) {
-      console.error("Error fetching audit logs:", error);
+    } catch (err) {
+      setLogs([]);
+      setTotal(0);
+      setTotalPages(1);
+      setError(err?.response?.data?.error || err?.message || "Failed to load audit logs");
     } finally {
       setLoading(false);
     }
@@ -62,6 +85,19 @@ const AuditLog = () => {
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="card p-4 animate-pulse bg-ink-50 h-16" />
           ))}
+        </div>
+      ) : error ? (
+        <div className="card">
+          <EmptyState
+            icon={AlertCircle}
+            title="Could not load audit trail"
+            description={error}
+            action={
+              <button onClick={fetchLogs} className="btn-secondary mt-2">
+                Try again
+              </button>
+            }
+          />
         </div>
       ) : logs.length === 0 ? (
         <div className="card">
@@ -91,7 +127,7 @@ const AuditLog = () => {
                       {log.actor?.email && <p className="text-xs text-ink-400">{log.actor.email}</p>}
                     </td>
                     <td className="px-5 py-3">
-                      <Badge tone="ink">{log.action}</Badge>
+                      <Badge tone={actionTone(log.action)}>{log.action}</Badge>
                     </td>
                     <td className="px-5 py-3">
                       <Badge tone={ENTITY_COLORS[log.entity] || "ink"}>{log.entity}</Badge>

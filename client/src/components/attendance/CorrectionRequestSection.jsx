@@ -6,9 +6,7 @@ import Button from "../ui/Button";
 import Badge from "../ui/Badge";
 import Modal from "../ui/Modal";
 import EmptyState from "../ui/EmptyState";
-import { formatNepalDate, formatNepalTime } from "../../utils/format";
-
-const TZ = "Asia/Kathmandu";
+import { formatNepalDate, formatNepalTime, shiftNepalKey, todayNepalKey } from "../../utils/format";
 
 const statusBadge = (s) => {
   const toneMap = { PENDING: "warning", APPROVED: "success", REJECTED: "danger" };
@@ -28,10 +26,8 @@ const CorrectionRequestSection = ({ onRequestSent }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Max selectable date = yesterday (today - 1 day in Nepal)
-  const maxDate = new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
-  maxDate.setDate(maxDate.getDate() - 1);
-  const maxDateStr = maxDate.toISOString().split("T")[0];
+  // The server only accepts past days; cap the picker at yesterday in Nepal time.
+  const maxDateStr = shiftNepalKey(todayNepalKey(), -1);
 
   const fetchRequests = useCallback(async () => {
     try {

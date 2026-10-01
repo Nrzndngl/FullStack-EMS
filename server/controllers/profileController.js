@@ -1,4 +1,5 @@
 import Employee from "../models/Employee.js";
+import mongoose from "mongoose";
 import User from "../models/User.js";
 
 
@@ -51,6 +52,9 @@ export const getProfileByEmployeeId = async (req, res) => {
         const { id } = req.params;
         const session = req.session;
         const isAdmin = session?.role === "ADMIN";
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ error: "Invalid employee id" });
+        }
         const employee = await Employee.findById(id).populate("userId", "email role").lean();
         if (!employee) return res.status(404).json({ error: "Employee not found" });
 

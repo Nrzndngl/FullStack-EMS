@@ -57,9 +57,22 @@ describe("createEmployeeSchema", () => {
             firstName: "Ram",
             lastName: "Sharma",
             email: "ram@b.com",
+            phone: "9801234567",
+            department: "Engineering",
+            position: "Software Engineer",
             password: "longenough1",
+            joinDate: "2026-01-01",
         });
         expect(r.success).toBe(true);
+    });
+    it("rejects when model-required employee fields are omitted", () => {
+        const r = createEmployeeSchema.safeParse({
+            firstName: "Ram",
+            lastName: "Sharma",
+            email: "ram@b.com",
+            password: "longenough1",
+        });
+        expect(r.success).toBe(false);
     });
 });
 

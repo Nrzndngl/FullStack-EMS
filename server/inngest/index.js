@@ -2,10 +2,15 @@ import { Inngest } from "inngest";
 import Attendance from "../models/Attendance.js";
 import Employee from "../models/Employee.js";
 import LeaveApplication from "../models/LeaveApplication.js";
+import { nepalDateKey } from "../utils/time.js";
 import sendEmail from "../config/nodemailer.js";
 
 // Create a client to send and receive events
 export const inngest = new Inngest({ id: "fulstack-ems" });
+
+// Start of the current Nepal day (Asia/Kathmandu, UTC+05:45) as a real Date.
+const nepalDayStart = () =>
+    new Date(`${nepalDateKey()}T00:00:00+05:45`);
 
 // Auto Check-out
 const autoCheckOut = inngest.createFunction(
@@ -15,36 +20,39 @@ const autoCheckOut = inngest.createFunction(
         const { employeeId, attendanceId } = event.data;
 
         //wait for 9 Hrs
-        await step.sleepUntil("wait-for-9-hours", new Date(new Date().getTime() + 9 * 60 * 60 * 1000))
+        await step.sleepUntil("wait-for-9-hours", new Date(Date.now() + 9 * 60 * 60 * 1000))
 
         // GET ATTENDANCE DATA
-        let attendance = await Attendance.findById(attendanceId)
+        const current = await Attendance.findById(attendanceId)
+        const employee = current ? await Employee.findById(current.employeeId || employeeId) : null;
+        if (!current || !employee) return; // record or employee gone — nothing to do
 
-        if (!attendance?.checkOut) {
-            //get Employee data
-            const employee = await Employee.findById(employeeId)
-
+        if (!current.checkOut) {
             // SEND REMINDER EMAIL
             await sendEmail({
                 to: employee.email,
                 subject: "Remember to Check-out",
                 body: `<div style="max-width: 600px;">
                 <h2>Hi ${employee.firstName},</h2>
-                <p style="font-size: 16px;">You have a check-in in ${employee.department} today :< /p>
-                <p style="font-size: 18px; font-weight: bold; color:#007bff; margin: 8px 0;">${attendance?.checkIn?.toLocaleTimeString()}</p>
-                <p style="font-size: 16px;">Please make sure to check-out in one hour .< /p>
-                <p style="font-size: 16px;">If you have any questions,please contact your admin .< /p>
+                <p style="font-size: 16px;">You have a check-in in ${employee.department} today :</p>
+                <p style="font-size: 18px; font-weight: bold; color:#007bff; margin: 8px 0;">${current?.checkIn ? new Date(current.checkIn).toLocaleTimeString() : ""}</p>
+                <p style="font-size: 16px;">Please make sure to check-out in one hour .</p>
+                <p style="font-size: 16px;">If you have any questions,please contact your admin .</p>
                 <br />
                 <p style="font-size: 16px;">Best Regards,</p>
                 <p style="font-size: 16px;">EMS</p>
                 </div>`
             })
 
-            //AFTER 10 HRS, MARK ATTENDANCE
-            await step.sleepUntil("wait-for-10-hours", new Date(new Date().getTime() + 1 * 60 * 60 * 1000))
+            //AFTER 10 HRS TOTAL, FORCE CHECK-OUT
+            await step.sleepUntil("wait-for-10-hours", new Date(Date.now() + 1 * 60 * 60 * 1000))
 
-            attendance = await Attendance.findById(attendanceId)
-            if (!attendance?.checkOut) {
+            const attendance = await Attendance.findById(attendanceId)
+            if (attendance && !attendance.checkOut) {
+                // Never derive a checkout from a null check-in (legacy/corrupt rows).
+                if (!attendance.checkIn) {
+                    attendance.checkIn = attendance.date || nepalDayStart();
+                }
                 attendance.checkOut = new Date(new Date(attendance.checkIn).getTime() + 4 * 60 * 60 * 1000);
                 attendance.workingHours = 4;
                 attendance.dayType = "Half Day";
@@ -87,16 +95,15 @@ const leaveApplicationReminder = inngest.createFunction(
     }
 );
 
-// CRON: CHECK ATTENDANCE AT 11:30 AM
+// CRON: CHECK ATTENDANCE AT 11:30 AM (Nepal time)
 const attendanceReminderCron = inngest.createFunction(
-    { id: "attendance-application-reminder", triggers: [{ cron: "TZ=Asia/Kolkata 30 11 * * *" }] },
+    { id: "attendance-application-reminder", triggers: [{ cron: "TZ=Asia/Kathmandu 30 11 * * *" }] },
     async ({ step }) => {
         //get All Employee Data
         const today = await step.run("get-today-date", () => {
-            const startUTC = new Date(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }) + "T00:00:00 + 05:30");
+            const startUTC = nepalDayStart();
             const endUTC = new Date(startUTC.getTime() + 24 * 60 * 60 * 1000);
-
-            return { startUTC: startUTC.toLocaleDateString(), endUTC: endUTC.toISOString() };
+            return { startUTC, endUTC };
         })
 
         // Get all active,non-deleted employees

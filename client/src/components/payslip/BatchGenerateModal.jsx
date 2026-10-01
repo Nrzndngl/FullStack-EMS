@@ -22,10 +22,13 @@ const BatchGenerateModal = ({ open, onClose, onSuccess }) => {
     setLoading(true);
     try {
       const res = await api.post("/payslips/batch", { month: Number(month), year: Number(year) });
-      toast.success(
-        `Generated ${res.data.created} payslip(s)` +
-          (res.data.skipped ? `, skipped ${res.data.skipped} existing` : "")
-      );
+      const created = res.data?.created ?? 0;
+      const skipped = res.data?.skipped ?? 0;
+      const errors = res.data?.errors || [];
+      toast.success(`Created ${created} payslip(s), skipped ${skipped}`);
+      errors.forEach((msg) => toast.error(msg));
+      setMonth(String(now.getMonth() + 1));
+      setYear(String(now.getFullYear()));
       onSuccess?.();
       onClose?.();
     } catch (error) {

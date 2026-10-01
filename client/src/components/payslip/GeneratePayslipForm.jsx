@@ -12,17 +12,28 @@ const GeneratePayslipForm = ({ employees, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries())
+    const basic = Number(data.basicSalary) || 0;
+    const allowances = Number(data.allowances) || 0;
+    const deductions = Number(data.deductions) || 0;
+    if (basic + allowances - deductions < 0) {
+      toast.error("Net salary cannot be negative");
+      return;
+    }
+    setLoading(true)
     try {
       await api.post('/payslips', data)
+      toast.success("Payslip generated")
       setIsOpen(false)
+      setSelectedEmployee("")
+      e.currentTarget.reset()
       onSuccess()
     } catch (error) {
       toast.error(error.response?.data?.error || error?.message);
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -80,17 +91,17 @@ const GeneratePayslipForm = ({ employees, onSuccess }) => {
 
           <div>
             <label className="field-label">Basic Salary</label>
-            <input className="input" type="number" name="basicSalary" required placeholder="5000" />
+            <input className="input" type="number" name="basicSalary" min="0" required placeholder="5000" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="field-label">Allowances</label>
-              <input className="input" type="number" name="allowances" defaultValue="0" />
+              <input className="input" type="number" name="allowances" min="0" defaultValue="0" />
             </div>
             <div>
               <label className="field-label">Deductions</label>
-              <input className="input" type="number" name="deductions" defaultValue="0" />
+              <input className="input" type="number" name="deductions" min="0" defaultValue="0" />
             </div>
           </div>
 
