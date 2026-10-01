@@ -28,6 +28,7 @@ const Attendance = () => {
   const [totalPages, setTotalPages] = useState(1);
 
   const fetchData = useCallback(async () => {
+    if (isAdmin) return;
     try {
       const res = await api.get(`/attendance?page=${page}&pageSize=15`);
       setHistory(res.data?.data || []);
@@ -38,7 +39,7 @@ const Attendance = () => {
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [page, isAdmin]);
 
   useEffect(() => {
     fetchData();
