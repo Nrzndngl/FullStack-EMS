@@ -8,7 +8,8 @@ const UserSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: true
+        required: true,
+        select: false,
     },
     role: {
         type: String,
@@ -19,10 +20,19 @@ const UserSchema = new mongoose.Schema({
         type: String,
         default: ""
     },
+    isActive: {
+        type: Boolean,
+        default: true,
+    },
+    tokenVersion: {
+        type: Number,
+        default: 0,
+    },
     resetPasswordToken: {
         type: String,
         default: null,
         index: true,
+        select: false,
     },
     resetPasswordExpires: {
         type: Date,

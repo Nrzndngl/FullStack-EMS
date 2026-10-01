@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { Megaphone, Plus, Pin, Trash2, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import api from "../api/axios.js";
 import toast from "react-hot-toast";
@@ -8,8 +8,12 @@ import Button from "../components/ui/Button";
 import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
+import Loading from "../components/Loading";
+import { useAuth } from "../context/AuthContext";
 
 const Announcements = () => {
+  const { user, loading: authLoading } = useAuth();
+  const isAdmin = user?.role === "ADMIN" || user?.role_type === "ADMIN";
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -30,8 +34,11 @@ const Announcements = () => {
   }, [page]);
 
   useEffect(() => {
-    fetchAnnouncements();
-  }, [fetchAnnouncements]);
+    if (isAdmin) fetchAnnouncements();
+  }, [fetchAnnouncements, isAdmin]);
+
+  if (authLoading) return <Loading full={false} />;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

@@ -1,5 +1,6 @@
 import Employee from "../models/Employee.js";
 import bcrypt from "bcrypt"
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import Attendance from "../models/Attendance.js";
 import LeaveApplication from "../models/LeaveApplication.js";
@@ -13,9 +14,22 @@ export const getEmployees = async (req, res) => {
         const { department } = req.query;
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 12));
-        const where = {};
-        if (department) {
+        const where = { isDeleted: { $ne: true } };
+        if (typeof department === "string" && department) {
             where.department = department;
+        }
+
+        // Server-side search so results are not limited to the loaded page.
+        const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+        if (search.length >= 1) {
+            const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const pattern = new RegExp(escaped, "i");
+            where.$or = [
+                { firstName: pattern },
+                { lastName: pattern },
+                { email: pattern },
+                { position: pattern },
+            ];
         }
 
         const [employees, total] = await Promise.all([
@@ -41,6 +55,9 @@ export const getEmployees = async (req, res) => {
 export const getEmployeeById = async (req, res) => {
     try {
         const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ error: "Invalid employee id" });
+        }
         const employee = await Employee.findById(id).populate("userId", "email role").lean();
         if (!employee) return res.status(404).json({ error: "Employee not found" });
 
@@ -87,22 +104,30 @@ export const createEmployee = async (req, res) => {
             name: `${firstName} ${lastName}`.trim()
         })
 
-        const employee = await Employee.create({
-            userId: user._id,
-            firstName,
-            lastName,
-            email,
-            phone,
-            position,
-            department: department || "Engineering",
-            basicSalary: Number(basicSalary) || 0,
-            allowances: Number(allowances) || 0,
-            deductions: Number(deductions) || 0,
-            joinDate: joinDate ? new Date(joinDate) : new Date(),
-            bio: bio || "",
-            image: image || ""
-        })
-        res.status(201).json({ success: true, employee })
+        let createdUserId = null;
+        try {
+            const employee = await Employee.create({
+                userId: user._id,
+                firstName,
+                lastName,
+                email,
+                phone,
+                position,
+                department: department || "Engineering",
+                basicSalary: Number(basicSalary) || 0,
+                allowances: Number(allowances) || 0,
+                deductions: Number(deductions) || 0,
+                joinDate: joinDate ? new Date(joinDate) : new Date(),
+                bio: bio || "",
+                image: image || ""
+            })
+        } catch (employeeError) {
+            // Roll back the User we just created so we don't leave an orphaned
+            // login that can never sign in (no matching Employee row).
+            await User.findByIdAndDelete(user._id).catch(() => {});
+            throw employeeError;
+        }
+        res.status(201).json({ success: true, employee: employee.toObject() })
 
         await recordAudit({
             actorId: req.session.userId,
@@ -126,35 +151,48 @@ export const createEmployee = async (req, res) => {
 export const updateEmployee = async (req, res) => {
     try {
         const { id } = req.params;
-        const { firstName, lastName, email, phone, department, position, basicSalary, allowances, deductions, password, role, bio, employmentStatus, image } = req.body;
-        //Validation
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ error: "Invalid employee id" });
+        }
+
+        const { firstName, lastName, email, phone, department, position, basicSalary, allowances, deductions, password, role, bio, employmentStatus, image, joinDate } = req.body;
+
         const employee = await Employee.findById(id)
         if (!employee) {
             return res.status(404).json({ error: "Employee not found" })
         }
 
-        await Employee.findByIdAndUpdate(id, {
-            firstName,
-            lastName,
-            email,
-            phone,
-            position,
-            department: department || "Engineering",
-            basicSalary: Number(basicSalary) || 0,
-            allowances: Number(allowances) || 0,
-            deductions: Number(deductions) || 0,
-            employmentStatus: employmentStatus || "ACTIVE",
-            bio: bio || "",
-            image: image || ""
-        })
+        // Only touch the fields that were actually provided. Using `|| 0`
+        // defaults here would silently zero salaries or reset departments.
+        const fields = {};
+        if (firstName !== undefined) fields.firstName = firstName;
+        if (lastName !== undefined) fields.lastName = lastName;
+        if (email !== undefined) fields.email = email;
+        if (phone !== undefined) fields.phone = phone;
+        if (position !== undefined) fields.position = position;
+        if (department !== undefined) fields.department = department;
+        if (basicSalary !== undefined) fields.basicSalary = Number(basicSalary) || 0;
+        if (allowances !== undefined) fields.allowances = Number(allowances) || 0;
+        if (deductions !== undefined) fields.deductions = Number(deductions) || 0;
+        if (employmentStatus !== undefined) fields.employmentStatus = employmentStatus;
+        if (bio !== undefined) fields.bio = bio;
+        if (image !== undefined) fields.image = image;
+        if (joinDate !== undefined) fields.joinDate = new Date(joinDate);
 
-        //UPDATE USER RECORD
-        const userUpdate = { email }
-        if (role) userUpdate.role = role;
+        if (Object.keys(fields).length) {
+            await Employee.findByIdAndUpdate(id, { $set: fields });
+        }
+
+        // UPDATE USER RECORD
+        const userUpdate = {};
+        if (email !== undefined) userUpdate.email = email;
+        if (role !== undefined) userUpdate.role = role;
         if (password) userUpdate.password = await bcrypt.hash(password, 10);
-        if (firstName || lastName) userUpdate.name = `${firstName || ""} ${lastName || ""}`.trim();
+        if (firstName !== undefined || lastName !== undefined) userUpdate.name = `${firstName ?? employee.firstName} ${lastName ?? employee.lastName}`.trim();
 
-        await User.findByIdAndUpdate(employee.userId, userUpdate)
+        if (Object.keys(userUpdate).length) {
+            await User.findByIdAndUpdate(employee.userId, { $set: userUpdate });
+        }
 
         const updated = await Employee.findById(id).lean();
 
@@ -163,7 +201,7 @@ export const updateEmployee = async (req, res) => {
             action: "UPDATE",
             entity: "EMPLOYEE",
             entityId: id,
-            details: { email },
+            details: { email: updated?.email },
         });
 
         return res.json({ success: true, employee: { ...updated, id: updated._id.toString() } })
@@ -181,6 +219,9 @@ export const updateEmployee = async (req, res) => {
 export const deleteEmployee = async (req, res) => {
     try {
         const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ error: "Invalid employee id" });
+        }
         const employee = await Employee.findById(id);
         if (!employee) {
             return res.status(404).json({ error: "Employee not found" })

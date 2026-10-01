@@ -28,6 +28,7 @@ const Sidebar = ({ userName, mobileOpen, setMobileOpen }) => {
     role === "ADMIN"
       ? { name: "Employees", href: "/employees", icon: UserIcon }
       : { name: "Attendance", href: "/attendance", icon: CalendarIcon },
+    ...(role === "ADMIN" ? [{ name: "Attendance", href: "/attendance", icon: CalendarIcon }] : []),
     { name: "Leave", href: "/leave", icon: FileTextIcon },
     { name: "Payslips", href: "/payslips", icon: DollarSignIcon },
     ...(role === "ADMIN" ? [{ name: "Announcements", href: "/announcements", icon: MegaphoneIcon }] : []),

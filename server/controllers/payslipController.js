@@ -1,4 +1,5 @@
 import Payslip from "../models/Payslip.js";
+import mongoose from "mongoose";
 import Employee from "../models/Employee.js";
 import User from "../models/User.js";
 import Attendance from "../models/Attendance.js";
@@ -7,6 +8,7 @@ import { recordAudit } from "../utils/audit.js";
 import { monthRangeForYearMonth, nepalDateKey, daysBetweenNepalKeys } from "../utils/time.js";
 import { sendPayslipEmail } from "../utils/notifications.js";
 import { notifyUser } from "./notificationController.js";
+import { queryId } from "../validators/index.js";
 
 // CREATE PAYSLIPS
 export const createPayslip = async (req, res) => {
@@ -24,7 +26,7 @@ export const createPayslip = async (req, res) => {
             return res.status(400).json({ error: "Payslip already exists for this employee and month" });
         }
 
-        const netSalary = Number(basicSalary) + Number(allowances || 0) - Number(deductions || 0);
+        const netSalary = Math.max(0, Number(basicSalary) + Number(allowances || 0) - Number(deductions || 0));
 
         const payslip = await Payslip.create({
             employeeId,
@@ -136,7 +138,7 @@ export const generateBatchPayslips = async (req, res) => {
                 const basicSalary = Number(employee.basicSalary) || 0;
                 const allowances = Number(employee.allowances) || 0;
                 const deductions = Number(employee.deductions) || 0;
-                const overtimePay = totalOvertime ? Math.round(totalOvertime * (basicSalary / (attendanceAgg || 1) / 8)) : 0;
+                const overtimePay = totalOvertime ? Math.max(0, Math.round(totalOvertime * (basicSalary / (attendanceAgg || 1) / 8))) : 0;
 
                 await Payslip.create({
                     employeeId: employee._id,
@@ -145,7 +147,7 @@ export const generateBatchPayslips = async (req, res) => {
                     basicSalary,
                     allowances,
                     deductions,
-                    netSalary: basicSalary + allowances - deductions + overtimePay,
+                    netSalary: Math.max(0, basicSalary + allowances - deductions + overtimePay),
                     workingDays: workingDays + paidLeaveDays,
                     overtimeHours: totalOvertime,
                 });
@@ -177,10 +179,18 @@ export const getPayslips = async (req, res) => {
         const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 10));
         const isAdmin = session.role === "ADMIN";
         if (isAdmin) {
+            // Admin-only per-employee scoping so detail views can fetch one
+            // employee's payslips instead of an unrelated page.
+            const where = {};
+            if (req.query.employeeId) {
+                const employeeId = queryId(req.query.employeeId);
+                if (!employeeId) return res.status(400).json({ error: "Invalid employeeId" });
+                where.employeeId = employeeId;
+            }
             const [payslips, total] = await Promise.all([
-                Payslip.find().populate("employeeId").
+                Payslip.find(where).populate("employeeId").
                     sort({ createdAt: -1 }).skip((page - 1) * pageSize).limit(pageSize),
-                Payslip.countDocuments(),
+                Payslip.countDocuments(where),
             ]);
             const data = payslips.map((p) => {
                 const obj = p.toObject();
@@ -213,8 +223,14 @@ export const getPayslips = async (req, res) => {
 // GET SINGLE PAYSLIP BY ID
 export const getPayslipById = async (req, res) => {
     try {
+        const { id } = req.params;
         const session = req.session;
-        const payslip = await Payslip.findById(req.params.id).populate("employeeId").lean();
+
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ error: "Invalid payslip id" });
+        }
+
+        const payslip = await Payslip.findById(id).populate("employeeId").lean();
 
         if (!payslip) return res.status(404).json({ error: "Payslip not found" });
 

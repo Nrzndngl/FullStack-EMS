@@ -82,6 +82,10 @@ body {
     outline-offset: 2px;
 }
 
+@page {
+    margin: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

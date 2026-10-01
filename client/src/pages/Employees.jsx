@@ -12,12 +12,22 @@ const Employees = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedDept, setSelectedDept] = useState("");
   const [editEmployee, setEditEmployee] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const pageSize = 12;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -26,6 +36,7 @@ const Employees = () => {
       params.set("page", String(page));
       params.set("pageSize", String(pageSize));
       if (selectedDept) params.set("department", selectedDept);
+      if (debouncedSearch) params.set("search", debouncedSearch);
       const res = await api.get(`/employees?${params.toString()}`);
       const payload = res.data;
       if (Array.isArray(payload.data)) {
@@ -42,18 +53,16 @@ const Employees = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, selectedDept]);
+  }, [page, selectedDept, debouncedSearch]);
 
   useEffect(() => {
     fetchEmployees();
   }, [fetchEmployees]);
 
-  const q = search.toLowerCase().trim();
-  const filtered = employees.filter((emp) =>
-    `${emp.firstName} ${emp.lastName} ${emp.position} ${emp.department}`
-      .toLowerCase()
-      .includes(q)
-  );
+  const handleDeleted = useCallback(() => {
+    if (employees.length <= 1 && page > 1) setPage((p) => p - 1);
+    else fetchEmployees();
+  }, [employees.length, page, fetchEmployees]);
 
   return (
     <div className="animate-fade-in">
@@ -107,26 +116,26 @@ const Employees = () => {
             </div>
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : employees.length === 0 ? (
         <div className="card">
           <EmptyState
             icon={Users}
-            title={employees.length === 0 ? "No employees yet" : "No results found"}
+            title={debouncedSearch ? "No results found" : "No employees yet"}
             description={
-              employees.length === 0
-                ? "Add your first employee to get started."
-                : "Try adjusting your search or filter."
+              debouncedSearch
+                ? "Try adjusting your search or filter."
+                : "Add your first employee to get started."
             }
           />
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
-            {filtered.map((emp) => (
+            {employees.map((emp) => (
               <EmployeeCard
                 key={emp._id || emp.id}
                 employee={emp}
-                onDelete={fetchEmployees}
+                onDelete={handleDeleted}
                 onEdit={(e) => setEditEmployee(e)}
               />
             ))}

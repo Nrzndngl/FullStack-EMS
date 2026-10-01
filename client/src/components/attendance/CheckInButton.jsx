@@ -14,7 +14,15 @@ const CheckInButton = ({ todayRecord, onAction }) => {
       const res = await api.post("/attendance");
       onAction();
       const type = res.data?.type;
-      toast.success(type === "CHECK_OUT" ? "Checked out. Have a great day!" : "Checked in. Welcome!");
+      if (type === "CHECK_OUT") {
+        toast.success("Checked out. Have a great day!");
+      } else if (type === "Already Checked Out") {
+        toast("You are already checked out for today.");
+      } else if (res.data?.data?.status === "LATE") {
+        toast.success("Checked in. You arrived late today.");
+      } else {
+        toast.success("Checked in. Welcome!");
+      }
     } catch (error) {
       toast.error(error?.response?.data?.error || error?.message);
     } finally {

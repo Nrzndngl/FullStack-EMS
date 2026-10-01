@@ -1,23 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import api from "../../api/axios";
-import { formatDisplayDate } from "../../utils/format";
-
-const TZ = "Asia/Kathmandu";
+import { formatDisplayDate, nepalDateKey, dateFromNepalKey } from "../../utils/format";
 
 const pad = (n) => String(n).padStart(2, "0");
 
-const nepalYMD = (d = new Date()) => {
-  const fmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-  return fmt.format(d);
-};
-
 const monthDays = (year, month /* 1-based */) => new Date(Date.UTC(year, month, 0)).getUTCDate();
+
+const monthLabel = (year, month) =>
+  new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kathmandu",
+    month: "long",
+    year: "numeric",
+  }).format(dateFromNepalKey(`${year}-${pad(month)}-01`));
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -36,7 +31,7 @@ const LEGEND = [
 ];
 
 const AttendanceCalendar = () => {
-  const todayKey = nepalYMD();
+  const todayKey = nepalDateKey();
   const [view, setView] = useState(() => {
     const [y, m] = todayKey.split("-").map(Number);
     return { year: y, month: m };
@@ -73,7 +68,7 @@ const AttendanceCalendar = () => {
 
   const recordByKey = {};
   records.forEach((r) => {
-    recordByKey[nepalYMD(new Date(r.date))] = r;
+    recordByKey[nepalDateKey(r.date)] = r;
   });
   const holidayByKey = {};
   holidays.forEach((h) => {
@@ -115,10 +110,7 @@ const AttendanceCalendar = () => {
             <ChevronLeft className="w-4 h-4" />
           </button>
           <span className="text-sm font-medium text-ink-700 min-w-[110px] text-center">
-            {new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-GB", {
-              month: "long",
-              year: "numeric",
-            })}
+            {monthLabel(year, month)}
           </span>
           <button
             onClick={() => shiftMonth(1)}
@@ -164,10 +156,10 @@ const AttendanceCalendar = () => {
                   key={key}
                   title={
                     record
-                      ? `${formatDisplayDate(new Date(key + "T00:00:00"))} — ${record.status}`
+                      ? `${formatDisplayDate(dateFromNepalKey(key))} — ${record.status}`
                       : holiday
                       ? `${holiday.name} (holiday)`
-                      : formatDisplayDate(new Date(key + "T00:00:00"))
+                      : formatDisplayDate(dateFromNepalKey(key))
                   }
                   className={`relative aspect-square rounded-lg flex items-center justify-center text-sm font-medium transition-colors ${tone} ${
                     isFuture ? "opacity-40" : ""} ${isToday ? "ring-2 ring-primary-500" : ""}`}

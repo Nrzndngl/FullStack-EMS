@@ -32,8 +32,8 @@ const EmployeeDetail = () => {
         const [empRes, attRes, leaveRes, payRes] = await Promise.allSettled([
           api.get(`/employees/${id}`),
           api.get(`/attendance/all?employeeId=${id}&pageSize=5`),
-          api.get(`/leaves?pageSize=5`),
-          api.get(`/payslips?pageSize=5`),
+          api.get(`/leaves?employeeId=${id}&pageSize=5`),
+          api.get(`/payslips?employeeId=${id}&pageSize=5`),
         ]);
         if (empRes.status === "fulfilled") setEmployee(empRes.value.data);
         if (attRes.status === "fulfilled") setAttendance(attRes.value.data?.data || attRes.value.data || []);

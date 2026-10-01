@@ -22,6 +22,8 @@ const toDateTimeLocal = (value) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+const MONGO_ID = /^[a-f\d]{24}$/i;
+
 const RecordsTab = () => {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,29 +31,48 @@ const RecordsTab = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const pageSize = 20;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
+  const invalidFilter = debouncedSearch.length > 0 && !MONGO_ID.test(debouncedSearch);
 
   const fetchRecords = useCallback(async () => {
     try {
       setLoading(true);
+      setError("");
       const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-      if (search) params.set("employeeId", search);
+      if (MONGO_ID.test(debouncedSearch)) params.set("employeeId", debouncedSearch);
       const res = await api.get(`/attendance/all?${params.toString()}`);
       setRecords(res.data?.data || []);
       setTotal(res.data?.total || 0);
       setTotalPages(res.data?.totalPages || 1);
-    } catch (error) {
-      toast.error(error?.response?.data?.error || "Failed to load attendance");
+    } catch (err) {
+      setRecords([]);
+      setTotal(0);
+      setTotalPages(1);
+      setError(err?.response?.data?.error || "Failed to load attendance");
+      if (err?.response?.status !== 400) toast.error(err?.response?.data?.error || "Failed to load attendance");
     } finally {
       setLoading(false);
     }
-  }, [page, search]);
+  }, [page, debouncedSearch]);
 
   useEffect(() => {
-    fetchRecords();
-  }, [fetchRecords]);
+    if (!invalidFilter) fetchRecords();
+    else setLoading(false);
+  }, [fetchRecords, invalidFilter]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -82,15 +103,34 @@ const RecordsTab = () => {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
           <input
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Filter by employee ID..."
             className="input pl-10"
+            aria-label="Filter by employee ID"
           />
         </div>
         <Badge tone="ink">{total} records</Badge>
       </div>
 
-      {renderRecordsTable()}
+      {invalidFilter ? (
+        <div className="card">
+          <EmptyState
+            icon={Search}
+            title="Invalid employee ID"
+            description="Enter a 24-character employee ID to filter attendance records."
+          />
+        </div>
+      ) : error ? (
+        <div className="card">
+          <EmptyState
+            icon={Search}
+            title="Could not load attendance"
+            description={error}
+          />
+        </div>
+      ) : (
+        renderRecordsTable()
+      )}
 
       {/* Correct attendance modal */}
       <Modal

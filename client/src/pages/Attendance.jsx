@@ -15,6 +15,7 @@ import api from "../api/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { downloadBlob } from "../utils/download";
+import { nepalDateKey, todayNepalKey } from "../utils/format";
 
 const Attendance = () => {
   const { user } = useAuth();
@@ -56,12 +57,8 @@ const Attendance = () => {
     }
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayRecord = history.find((r) => {
-    const d = new Date(r.date);
-    return !isNaN(d.getTime()) && d.toDateString() === today.toDateString();
-  });
+  const todayKey = todayNepalKey();
+  const todayRecord = history.find((r) => nepalDateKey(r.date) === todayKey);
 
   return (
     <div className="animate-fade-in">
@@ -91,7 +88,7 @@ const Attendance = () => {
             <CheckInButton todayRecord={todayRecord} onAction={fetchData} />
           )}
 
-          <AttendanceStats history={history} />
+          <AttendanceStats />
           <AttendanceCalendar />
 
           <div className="flex items-center justify-between mb-4 mt-6">

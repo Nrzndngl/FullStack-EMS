@@ -1,4 +1,5 @@
 import Notification from "../models/Notification.js";
+import mongoose from "mongoose";
 
 // SEND A NOTIFICATION TO A USER (non-blocking)
 export const notifyUser = async ({ userId, title, message, type = "SYSTEM", link = null, entityId = null }) => {
@@ -38,6 +39,9 @@ export const getNotifications = async (req, res) => {
 export const markRead = async (req, res) => {
     try {
         const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ error: "Invalid notification id" });
+        }
         const notification = await Notification.findOneAndUpdate(
             { _id: id, userId: req.session.userId },
             { read: true },

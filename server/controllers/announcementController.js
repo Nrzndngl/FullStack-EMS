@@ -88,10 +88,11 @@ export const createAnnouncement = async (req, res) => {
             return res.status(400).json({ error: "Title and message are required" });
         }
 
+        const pinnedValue = pinned === true || pinned === "true";
         const announcement = await Announcement.create({
             title: title.trim(),
             body: body.trim(),
-            pinned: Boolean(pinned),
+            pinned: pinnedValue,
             authorId: req.session.userId,
         });
 
@@ -138,7 +139,7 @@ export const updateAnnouncement = async (req, res) => {
 
         if (typeof req.body.title === "string" && req.body.title.trim()) announcement.title = req.body.title.trim();
         if (typeof req.body.body === "string" && req.body.body.trim()) announcement.body = req.body.body.trim();
-        if (typeof req.body.pinned === "boolean") announcement.pinned = req.body.pinned;
+        if (req.body.pinned !== undefined) announcement.pinned = req.body.pinned === true || req.body.pinned === "true";
 
         await announcement.save();
 

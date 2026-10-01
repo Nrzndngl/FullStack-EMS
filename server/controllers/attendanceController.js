@@ -1,8 +1,19 @@
 import { inngest } from "../inngest/index.js";
+import mongoose from "mongoose";
 import Attendance from "../models/Attendance.js";
 import Employee from "../models/Employee.js";
 import { nepalNowTime, startOfNepalDay, nepalDateKey, dayRangeForDateKey } from "../utils/time.js";
 import { recordAudit } from "../utils/audit.js";
+import { queryId, queryDate, queryEnum } from "../validators/index.js";
+
+// Coerce a raw time value to a valid Date, or report it as invalid.
+// Returns { valid: true, value: Date } or { valid: false, reason: ... } when skipped.
+const parseTime = (value, label) => {
+    if (value === undefined || value === null || value === "") return { valid: true, value: null };
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return { valid: false, value: null, reason: `Invalid ${label}` };
+    return { valid: true, value: d };
+};
 
 
 // CLOCK IN/OUT FOR EMPLOYEE
@@ -46,14 +57,16 @@ export const clockInOut = async (req, res) => {
 
         // Record exists but no check-out -> CHECK OUT
         if (!existing.checkOut) {
-            const checkInTime = new Date(existing.checkIn).getTime()
-            const diffMs = now.getTime() - checkInTime;
-            const diffHours = diffMs / (1000 * 60 * 60)
+            const nowTs = now.getTime();
+            // Guard against legacy records with a null/missing checkIn so the
+            // computed hours can never be NaN / explode into millions of hours.
+            const checkInTime = existing.checkIn ? new Date(existing.checkIn).getTime() : nowTs;
+            const diffHours = Math.max(0, (nowTs - checkInTime) / (1000 * 60 * 60));
 
             existing.checkOut = now;
 
-            // COMPUTE WORKING HOURS & DAY TYPE
-            const workingHours = parseFloat(diffHours.toFixed(2));
+            // COMPUTE WORKING HOURS & DAY TYPE (clamped to a sane 0-24h window)
+            const workingHours = parseFloat(Math.min(24, diffHours).toFixed(2));
             const STANDARD_HOURS = 8;
             const overtimeHours = workingHours > STANDARD_HOURS
                 ? parseFloat((workingHours - STANDARD_HOURS).toFixed(2))
@@ -97,9 +110,14 @@ export const getAttendance = async (req, res) => {
         const where = { employeeId: employee._id };
 
         if (req.query.from || req.query.to) {
+            const from = queryDate(req.query.from);
+            const to = queryDate(req.query.to);
+            if (req.query.from && !from) return res.status(400).json({ error: "Invalid from date" });
+            if (req.query.to && !to) return res.status(400).json({ error: "Invalid to date" });
+            if (from && to && from > to) return res.status(400).json({ error: "from cannot be after to" });
             where.date = {};
-            if (req.query.from) where.date.$gte = dayRangeForDateKey(req.query.from).start;
-            if (req.query.to) where.date.$lte = dayRangeForDateKey(req.query.to).end;
+            if (from) where.date.$gte = dayRangeForDateKey(from).start;
+            if (to) where.date.$lte = dayRangeForDateKey(to).end;
         }
         const [history, total] = await Promise.all([
             Attendance.find(where).sort({ date: -1 }).skip((page - 1) * pageSize).limit(pageSize),
@@ -123,12 +141,25 @@ export const getAllAttendance = async (req, res) => {
         const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 20));
         const where = {};
 
-        if (req.query.employeeId) where.employeeId = req.query.employeeId;
-        if (req.query.status) where.status = req.query.status;
+        if (req.query.employeeId) {
+            const employeeId = queryId(req.query.employeeId);
+            if (!employeeId) return res.status(400).json({ error: "Invalid employeeId" });
+            where.employeeId = employeeId;
+        }
+        if (req.query.status) {
+            const status = queryEnum(req.query.status, ["PRESENT", "ABSENT", "LATE"]);
+            if (!status) return res.status(400).json({ error: "Invalid status" });
+            where.status = status;
+        }
         if (req.query.from || req.query.to) {
+            const from = queryDate(req.query.from);
+            const to = queryDate(req.query.to);
+            if (req.query.from && !from) return res.status(400).json({ error: "Invalid from date" });
+            if (req.query.to && !to) return res.status(400).json({ error: "Invalid to date" });
+            if (from && to && from > to) return res.status(400).json({ error: "from cannot be after to" });
             where.date = {};
-            if (req.query.from) where.date.$gte = dayRangeForDateKey(req.query.from).start;
-            if (req.query.to) where.date.$lte = dayRangeForDateKey(req.query.to).start;
+            if (from) where.date.$gte = dayRangeForDateKey(from).start;
+            if (to) where.date.$lte = dayRangeForDateKey(to).end;
         }
 
         const [records, total] = await Promise.all([
@@ -158,25 +189,49 @@ export const getAllAttendance = async (req, res) => {
 export const correctAttendance = async (req, res) => {
     try {
         const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ error: "Invalid attendance id" });
+        }
         const { checkIn, checkOut, status, dayType } = req.body;
+
+        // Validate anything the admin actually sent before mutating.
+        for (const [value, label] of [[checkIn, "checkIn"], [checkOut, "checkOut"]]) {
+            const parsed = parseTime(value, label);
+            if (!parsed.valid) return res.status(400).json({ error: parsed.reason });
+        }
 
         const record = await Attendance.findById(id);
         if (!record) return res.status(404).json({ error: "Attendance record not found" });
 
-        if (checkIn) record.checkIn = new Date(checkIn);
-        if (checkOut) record.checkOut = new Date(checkOut);
-        if (status) record.status = status;
-        if (dayType) record.dayType = dayType;
+        if (checkIn !== undefined && checkIn !== null && checkIn !== "") {
+            const parsed = new Date(checkIn);
+            if (record.checkIn === null && record.status === "ABSENT") record.status = "PRESENT";
+            record.checkIn = parsed;
+        }
+        if (checkOut !== undefined && checkOut !== null && checkOut !== "") {
+            record.checkOut = new Date(checkOut);
+        }
+        if (status && ["PRESENT", "ABSENT", "LATE"].includes(status)) record.status = status;
+        if (dayType && ["Full Day", "Three Quarter Day", "Half Day", "Short Day"].includes(dayType)) record.dayType = dayType;
 
-        // Recompute working hours when both times are present
+        // Recompute working hours + overtime + day type whenever both times exist.
+        // Null checkIn can never produce NaN: fall back to 0 hours.
         if (record.checkIn && record.checkOut) {
-            const diffMs = new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime();
-            const hours = diffMs / (1000 * 60 * 60);
-            record.workingHours = Math.max(0, parseFloat(hours.toFixed(2)));
+            const diffMs = Math.max(0, new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime());
+            const hours = Math.min(24, diffMs / (1000 * 60 * 60));
+            record.workingHours = parseFloat(hours.toFixed(2));
             const STANDARD_HOURS = 8;
             record.overtimeHours = record.workingHours > STANDARD_HOURS
                 ? parseFloat((record.workingHours - STANDARD_HOURS).toFixed(2))
                 : 0;
+
+            if (!dayType || !["Full Day", "Three Quarter Day", "Half Day", "Short Day"].includes(dayType)) {
+                let computed = "Short Day";
+                if (record.workingHours >= 8) computed = "Full Day";
+                else if (record.workingHours >= 6) computed = "Three Quarter Day";
+                else if (record.workingHours >= 4) computed = "Half Day";
+                record.dayType = computed;
+            }
         }
 
         await record.save();

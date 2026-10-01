@@ -36,6 +36,7 @@ const ProfileForm = ({ initialData, onSuccess }) => {
     e.preventDefault();
     setError("");
     setMessage("");
+    setLoading(true)
     const formData = new FormData(e.currentTarget)
     if (pendingImage) formData.append("image", pendingImage)
     try {
@@ -129,7 +130,7 @@ const ProfileForm = ({ initialData, onSuccess }) => {
             </div>
           ) : (
             <div className='sm:col-span-2 flex justify-end pt-2'>
-              <Button type="submit" loading={loading} className="w-full sm:w-auto">
+              <Button type="submit" loading={loading} disabled={loading} className="w-full sm:w-auto">
                 <Save className='w-4 h-4' /> Save Changes
               </Button>
             </div>

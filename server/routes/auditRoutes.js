@@ -10,8 +10,8 @@ auditRouter.get("/", protect, protectAdmin, async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 20));
         const where = {};
-        if (req.query.entity) where.entity = req.query.entity;
-        if (req.query.action) where.action = req.query.action;
+        if (typeof req.query.entity === "string" && req.query.entity) where.entity = req.query.entity;
+        if (typeof req.query.action === "string" && req.query.action) where.action = req.query.action;
 
         const [logs, total] = await Promise.all([
             AuditLog.find(where)

@@ -1,4 +1,5 @@
 import { inngest } from "../inngest/index.js";
+import mongoose from "mongoose";
 import Employee from "../models/Employee.js";
 import User from "../models/User.js";
 import LeaveApplication from "../models/LeaveApplication.js";
@@ -6,6 +7,7 @@ import { dayRangeForDateKey, daysBetweenNepalKeys, nepalDateKey } from "../utils
 import { recordAudit } from "../utils/audit.js";
 import { sendLeaveDecisionEmail } from "../utils/notifications.js";
 import { notifyUser } from "./notificationController.js";
+import { queryId } from "../validators/index.js";
 
 // CREATE LEAVE
 export const createLeave = async (req, res) => {
@@ -98,8 +100,15 @@ export const getLeaves = async (req, res) => {
         const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize) || 10));
         const isAdmin = session.role === "ADMIN";
         if (isAdmin) {
-            const status = req.query.status;
+            const status = ["PENDING", "APPROVED", "REJECTED"].includes(req.query.status) ? req.query.status : undefined;
             const where = status ? { status } : {};
+            // Admin-only per-employee scoping so detail views can fetch one
+            // employee's leave history instead of an unrelated page.
+            if (req.query.employeeId) {
+                const employeeId = queryId(req.query.employeeId);
+                if (!employeeId) return res.status(400).json({ error: "Invalid employeeId" });
+                where.employeeId = employeeId;
+            }
             const [leaves, total] = await Promise.all([
                 LeaveApplication.find(where).populate("employeeId").sort({ startDate: -1 }).skip((page - 1) * pageSize).limit(pageSize),
                 LeaveApplication.countDocuments(where),
@@ -144,28 +153,62 @@ export const getLeaves = async (req, res) => {
 // UPDATE LEAVE STATUS
 export const updateLeaveStatus = async (req, res) => {
     try {
+        const { id } = req.params;
+        if (!mongoose.isValidObjectId(id)) {
+            return res.status(400).json({ error: "Invalid leave id" });
+        }
         const { status } = req.body;
-        const leave = await LeaveApplication.findById(req.params.id);
+
+        let leave = await LeaveApplication.findById(id);
         if (!leave) return res.status(404).json({ error: "Leave not found" });
 
+        // Idempotent: re-sending the same status (e.g. approving an already
+        // approved leave) must not re-deduct the balance.
         if (leave.status === status) {
             return res.json({ success: true, data: leave });
         }
 
-        // Deduct entitlement exactly once when a request first becomes APPROVED
         if (status === "APPROVED") {
-            const days = daysBetweenNepalKeys(
+            const days = Math.max(1, daysBetweenNepalKeys(
                 nepalDateKey(leave.startDate),
                 nepalDateKey(leave.endDate)
+            ));
+
+            // Never approve into a negative balance.
+            const employee = await Employee.findById(leave.employeeId).select("leaveBalance").lean();
+            const balance = employee?.leaveBalance?.[leave.type];
+            if (balance != null && days > balance) {
+                return res.status(400).json({
+                    error: `Insufficient ${leave.type} leave balance (${days} required, ${balance} remaining) — cannot approve`,
+                });
+            }
+
+            // Atomic transition so two concurrent approvals cannot double-deduct.
+            const updated = await LeaveApplication.findOneAndUpdate(
+                { _id: id, status: { $ne: "APPROVED" } },
+                { $set: { status: "APPROVED" } },
+                { new: true }
             );
+            if (!updated) {
+                // Already APPROVED by a concurrent request -> idempotent success.
+                const current = await LeaveApplication.findById(id);
+                return res.json({ success: true, data: current });
+            }
+            leave = updated;
+
             await Employee.updateOne(
                 { _id: leave.employeeId },
                 { $inc: { [`leaveBalance.${leave.type}`]: -days } }
             );
+        } else {
+            const updated = await LeaveApplication.findOneAndUpdate(
+                { _id: id },
+                { $set: { status } },
+                { new: true }
+            );
+            if (!updated) return res.status(404).json({ error: "Leave not found" });
+            leave = updated;
         }
-
-        leave.status = status;
-        await leave.save();
 
         await recordAudit({
             actorId: req.session.userId,
