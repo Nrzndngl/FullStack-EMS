@@ -22,7 +22,9 @@ import announcementRouter from "./routes/announcementRoutes.js";
 import { serve } from "inngest/express";
 import { inngest, functions } from "./inngest/index.js"
 
-// Fail fast when critical secrets are missing or dangerously weak.
+// Fail fast when critical secrets are missing or dangerously weak. Instead of a
+// bare module-load crash (which Vercel reports as a headerless 500 on every
+// request), capture the message so the server can respond with a readable error.
 const bootChecks = () => {
     const required = [
         ["MONGODB_URI", "MongoDB connection string"],
@@ -31,58 +33,101 @@ const bootChecks = () => {
     ];
     for (const [key, label] of required) {
         if (!process.env[key] || process.env[key].length < 32) {
-            throw new Error(`FATAL: ${label} (${key}) is missing or too short. Set it in the environment.`);
+            console.error(`FATAL: ${label} (${key}) is missing or too short.`);
+            return `Missing or too-short ${label} (${key}). Set it in the deployment environment.`;
         }
     }
     if (process.env.NODE_ENV === "production" && !process.env.INNGEST_SIGNING_KEY) {
-        throw new Error("FATAL: INNGEST_SIGNING_KEY is required in production for /api/inngest.");
+        console.error("FATAL: INNGEST_SIGNING_KEY is missing.");
+        return "INNGEST_SIGNING_KEY is required in production for /api/inngest.";
     }
+    return null;
 };
 
 const app = express()
 const PORT = process.env.PORT || 4000;
 
-bootChecks();
+const bootError = bootChecks();
 
 // Behind Vercel/NGINX the client IP is carried by X-Forwarded-For
 app.set("trust proxy", 1);
 
+// Production frontend is allowed by default so a deploy without CORS_ORIGINS
+// works; CORS_ORIGINS can still override the list.
 const defaultOrigins = [
     "http://localhost:5173",
     "http://localhost:3000",
+    "https://full-stack-ems-bice-pi.vercel.app",
 ];
 const allowedOrigins = (process.env.CORS_ORIGINS || defaultOrigins.join(",")).split(",").map((s) => s.trim());
 
-//Middleware
-app.use(helmet());
-app.disable("x-powered-by");
-app.use(cors({
+//Middleware — CORS first, before body parsing, rate limiting, and routes. A
+// disallowed origin must NEVER throw inside the cors callback: that turns a
+// benign CORS block into a 500 (what the browser observed on the OPTIONS).
+const corsOptions = {
     origin(origin, callback) {
         // Allow requests with no origin (e.g. curl, server-to-server) and configured origins
         if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-        return callback(new Error("Not allowed by CORS"));
+        return callback(null, false); // no ACAO header -> browser blocks; server still answers 204
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     maxAge: 600,
+};
+app.use(cors(corsOptions));
+// Guarantee every OPTIONS request anywhere returns 204. Express 5 /
+// path-to-regexp v8 dropped the bare "*" wildcard (that crashes module load
+// with a 500), so use the named-splat syntax and finish non-preflight OPTIONS
+// with an explicit 204.
+app.options("/*splat", (req, res, next) =>
+    cors(corsOptions)(req, res, () => res.status(204).end())
+);
+
+// Express 5 + helmet: disable the headers that break cross-origin API reads
+// (Cross-Origin-Resource-Policy: same-origin is what produces the
+// "MissingAllowOriginHeader"-style failures on a CORS frontend), and CSP is
+// irrelevant for a JSON API that never renders HTML.
+app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false,
 }));
+app.disable("x-powered-by");
 app.use(express.json());
 app.use(cookieParser());
 
-// General API limiter (applied to all /api traffic, before body parsing)
-const apiLimiter = rateLimit({
+// If boot checks failed, answer every non-OPTIONS request with a readable error
+// so DevTools/Vercel logs show WHAT is wrong instead of a headerless 500.
+// Preflight OPTIONS are still answered by the CORS handler above (204 + ACAO).
+if (bootError) {
+    app.use("/", (req, res, next) => {
+        if (req.method === "OPTIONS") return next();
+        return res.status(500).json({ error: "Server misconfigured", detail: bootError });
+    });
+}
+
+// General API limiter (applied to all /api traffic, before body parsing).
+// OPTIONS preflights are skipped entirely (never counted, never blocking) and
+// proxy-header validation is off so odd X-Forwarded-For shapes from the edge
+// network cannot crash the middleware chain with a 500.
+const limiterCommon = {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    limit: Number(process.env.API_RATE_LIMIT) || 600,
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
+    skip: (req) => req.method === "OPTIONS",
+};
+const apiLimiter = rateLimit({
+    ...limiterCommon,
+    limit: Number(process.env.API_RATE_LIMIT) || 600,
     message: { error: "Too many requests, please try again later" },
 });
 app.use("/api", apiLimiter);
 
 const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    ...limiterCommon,
     limit: 30,
-    standardHeaders: true,
-    legacyHeaders: false,
     message: { error: "Too many login attempts, please try again later" },
 });
 app.use("/api/auth", authLimiter);
@@ -95,6 +140,8 @@ app.use("/api/employees", formParse);
 
 //Routes
 app.get("/", (req, res) => res.send("Server is running"));
+// Lightweight probe (no DB dependency) to distinguish env failures from DB failures
+app.get("/api/health", (req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRouter);
 app.use("/api/employees", employeeRouter);
 app.use("/api/profile", profileRouter);
@@ -132,7 +179,9 @@ app.use((err, req, res, next) => {
     res.status(err.status || 500).json({ error: "Internal server error" });
 });
 
-await connectDB();
+if (!bootError) {
+    await connectDB();
+}
 
 //Listening port
 app.listen(PORT, () => {
