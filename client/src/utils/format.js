@@ -36,6 +36,13 @@ export function nepalDateKey(value = new Date()) {
   return `${parts.year}-${pad(parts.month)}-${pad(parts.day)}`;
 }
 
+export function nepalMonthStartKey(value = new Date()) {
+  const parts = nepalYMD(value);
+  if (!parts) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${parts.year}-${pad(parts.month)}-01`;
+}
+
 export function todayNepalKey() {
   return nepalDateKey(new Date());
 }

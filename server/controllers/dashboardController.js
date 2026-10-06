@@ -17,7 +17,12 @@ export const getDashboard = async (req, res) => {
                     Employee.countDocuments({ isDeleted: { $ne: true } }),
                     (async () => {
                         const { start, end } = nepalTodayRange();
-                        return Attendance.countDocuments({ date: { $gte: start, $lt: end } });
+                        // Status filter so ABSENT placeholder rows created for
+                        // no-show employees don't inflate "attended today".
+                        return Attendance.countDocuments({
+                            date: { $gte: start, $lt: end },
+                            status: { $in: ["PRESENT", "LATE"] },
+                        });
                     })(),
 
                     LeaveApplication.countDocuments({ status: "PENDING" }),
@@ -44,12 +49,15 @@ export const getDashboard = async (req, res) => {
 
                         const results = await Promise.all(
                             months.map(async ({ y, m, start, end }) => {
-                                const all = await Attendance.countDocuments({ date: { $gte: start, $lt: end } });
+                                const present = await Attendance.countDocuments({
+                                    date: { $gte: start, $lt: end },
+                                    status: { $in: ["PRESENT", "LATE"] },
+                                });
                                 const late = await Attendance.countDocuments({
                                     date: { $gte: start, $lt: end },
                                     status: "LATE",
                                 });
-                                return { year: y, month: m, present: all - late, late, total: all };
+                                return { year: y, month: m, present, late, total: present };
                             })
                         );
                         return results;
@@ -92,6 +100,7 @@ export const getDashboard = async (req, res) => {
                 Attendance.countDocuments({
                     employeeId: employee._id,
                     date: { $gte: start, $lt: end },
+                    status: { $in: ["PRESENT", "LATE"] },
                 }),
                 LeaveApplication.countDocuments({
                     employeeId: employee._id,

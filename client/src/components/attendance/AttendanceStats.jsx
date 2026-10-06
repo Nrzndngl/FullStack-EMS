@@ -2,13 +2,18 @@ import { useCallback, useEffect, useState } from "react";
 import { CalendarCheck, AlertCircle, Clock } from "lucide-react";
 import api from "../../api/axios";
 import StatCard from "../ui/StatCard";
+import { nepalMonthStartKey, todayNepalKey } from "../../utils/format";
 
 const AttendanceStats = () => {
   const [records, setRecords] = useState([]);
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await api.get("/attendance?page=1&pageSize=200");
+      // Scope to the current Nepal month so the stats are a real monthly view
+      // instead of an unbounded history sample.
+      const from = nepalMonthStartKey();
+      const to = todayNepalKey();
+      const res = await api.get(`/attendance?from=${from}&to=${to}&page=1&pageSize=200`);
       setRecords(res.data?.data || []);
     } catch {
       setRecords([]);
@@ -31,9 +36,9 @@ const AttendanceStats = () => {
       : "—";
 
   const stats = [
-    { icon: CalendarCheck, value: totalPresent, label: "Days Present", hint: "Present or late", tone: "primary" },
-    { icon: AlertCircle, value: totalLate, label: "Late Arrivals", hint: "All recorded days", tone: "warning" },
-    { icon: Clock, value: `${avgHours} hrs`, label: "Avg. Work Hours", hint: "Per recorded day", tone: "ink" },
+    { icon: CalendarCheck, value: totalPresent, label: "Days Present", hint: "This month", tone: "primary" },
+    { icon: AlertCircle, value: totalLate, label: "Late Arrivals", hint: "This month", tone: "warning" },
+    { icon: Clock, value: `${avgHours} hrs`, label: "Avg. Work Hours", hint: "Per worked day", tone: "ink" },
   ];
 
   return (

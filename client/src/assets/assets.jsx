@@ -292,16 +292,17 @@ export const dummyAttendanceData = [
 
 export function getWorkingHoursDisplay(record) {
     if (record.workingHours != null) {
-        const hrs = Math.floor(record.workingHours);
-        const mins = Math.round((record.workingHours - hrs) * 60);
+        const totalMins = Math.max(0, Math.round(Number(record.workingHours) * 60));
+        const hrs = Math.floor(totalMins / 60);
+        const mins = totalMins % 60;
         return `${hrs}h ${mins}m`;
     }
     // If still checked in (no checkout), compute live hours
     if (record.checkIn && !record.checkOut) {
-        const diffMs = Date.now() - new Date(record.checkIn).getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
-        const hrs = Math.floor(diffHours);
-        const mins = Math.round((diffHours - hrs) * 60);
+        const diffMs = Math.max(0, Date.now() - new Date(record.checkIn).getTime());
+        const totalMins = Math.floor(diffMs / (1000 * 60));
+        const hrs = Math.floor(totalMins / 60);
+        const mins = totalMins % 60;
         return `${hrs}h ${mins}m (ongoing)`;
     }
     return "—";
