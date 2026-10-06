@@ -28,6 +28,14 @@ const UserSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
+    // sha256 of the currently-issued refresh token. Refresh tokens are
+    // rotated on every use, so a stolen token is rejected as soon as the
+    // victim's real browser refreshes once.
+    refreshTokenHash: {
+        type: String,
+        default: null,
+        select: false,
+    },
     resetPasswordToken: {
         type: String,
         default: null,

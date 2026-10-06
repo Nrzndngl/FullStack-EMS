@@ -12,7 +12,8 @@ const GeneratePayslipForm = ({ employees, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const formData = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const formData = new FormData(form);
     const data = Object.fromEntries(formData.entries())
     const basic = Number(data.basicSalary) || 0;
     const allowances = Number(data.allowances) || 0;
@@ -27,8 +28,8 @@ const GeneratePayslipForm = ({ employees, onSuccess }) => {
       toast.success("Payslip generated")
       setIsOpen(false)
       setSelectedEmployee("")
-      e.currentTarget.reset()
       onSuccess()
+      form.reset()
     } catch (error) {
       toast.error(error.response?.data?.error || error?.message);
     } finally {

@@ -78,7 +78,7 @@ const employeeSchema = new mongoose.Schema({
     }
 }, { timestamps: true })
 
-employeeSchema.index({ email: 1 })
+employeeSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { isDeleted: { $ne: true } } })
 employeeSchema.index({ department: 1 })
 
 const Employee = mongoose.models.Employee || mongoose.model("Employee", employeeSchema);

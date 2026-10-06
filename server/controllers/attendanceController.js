@@ -47,13 +47,20 @@ export const clockInOut = async (req, res) => {
                 status: isLate ? "LATE" : "PRESENT"
             });
 
-            await inngest.send({
-                name: "employee/check-out",
-                data: {
-                    employeeId: employee._id,
-                    attendanceId: attendance._id,
-                },
-            })
+            try {
+                await inngest.send({
+                    name: "employee/check-out",
+                    data: {
+                        employeeId: employee._id,
+                        attendanceId: attendance._id,
+                    },
+                })
+            } catch (err) {
+                // Fire-and-forget: a dead Inngest client must not turn a
+                // successful clock-in into a 500 (the cron will still force
+                // a check-out if this event was lost).
+                console.error("inngest send failed (clock-in):", err);
+            }
 
             return res.json({ success: true, type: "CHECK_IN", data: attendance })
         }
@@ -123,7 +130,7 @@ export const getAttendance = async (req, res) => {
             if (from && to && from > to) return res.status(400).json({ error: "from cannot be after to" });
             where.date = {};
             if (from) where.date.$gte = dayRangeForDateKey(from).start;
-            if (to) where.date.$lte = dayRangeForDateKey(to).end;
+            if (to) where.date.$lt = dayRangeForDateKey(to).end;
         }
         const [history, total] = await Promise.all([
             Attendance.find(where).sort({ date: -1 }).skip((page - 1) * pageSize).limit(pageSize),
@@ -165,7 +172,7 @@ export const getAllAttendance = async (req, res) => {
             if (from && to && from > to) return res.status(400).json({ error: "from cannot be after to" });
             where.date = {};
             if (from) where.date.$gte = dayRangeForDateKey(from).start;
-            if (to) where.date.$lte = dayRangeForDateKey(to).end;
+            if (to) where.date.$lt = dayRangeForDateKey(to).end;
         }
 
         const [records, total] = await Promise.all([

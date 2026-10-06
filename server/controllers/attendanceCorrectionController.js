@@ -22,6 +22,10 @@ const recomputeHours = (record) => {
         record.overtimeHours = record.workingHours > STANDARD_HOURS
             ? parseFloat((record.workingHours - STANDARD_HOURS).toFixed(2))
             : 0;
+        if (record.workingHours >= 8) record.dayType = "Full Day";
+        else if (record.workingHours >= 6) record.dayType = "Three Quarter Day";
+        else if (record.workingHours >= 4) record.dayType = "Half Day";
+        else record.dayType = "Short Day";
     }
     return record;
 };
@@ -46,17 +50,26 @@ export const createCorrectionRequest = async (req, res) => {
         if (Number.isNaN(parsedDate.getTime())) {
             return res.status(400).json({ error: "Invalid date" });
         }
-        for (const [value, label] of [[checkIn, "checkIn"], [checkOut, "checkOut"]]) {
-            if (value !== undefined && value !== null && value !== "") {
-                const t = new Date(value);
-                if (Number.isNaN(t.getTime())) return res.status(400).json({ error: `Invalid ${label}` });
-            }
-        }
 
         // Normalize to a Nepal calendar date; only past days can be corrected
         const dateKey = nepalDateKey(parsedDate);
         if (dateKey >= nepalDateKey()) {
             return res.status(400).json({ error: "You can only request corrections for past days" });
+        }
+
+        for (const [value, label] of [[checkIn, "checkIn"], [checkOut, "checkOut"]]) {
+            if (value !== undefined && value !== null && value !== "") {
+                const t = new Date(value);
+                if (Number.isNaN(t.getTime())) return res.status(400).json({ error: `Invalid ${label}` });
+                // Times must fall on the day being corrected, or a later query
+                // would mix it into a different day's record.
+                if (nepalDateKey(t) !== dateKey) {
+                    return res.status(400).json({ error: `${label} must be on the requested date` });
+                }
+            }
+        }
+        if (checkIn && checkOut && new Date(checkOut).getTime() <= new Date(checkIn).getTime()) {
+            return res.status(400).json({ error: "checkOut must be after checkIn" });
         }
 
         // A pending request for the same day blocks duplicates
@@ -92,7 +105,7 @@ export const createCorrectionRequest = async (req, res) => {
         const admins = await User.find({ role: "ADMIN" }).select("_id").lean();
         const adminIds = admins.map((a) => a._id.toString());
         const employeeName = `${employee.firstName} ${employee.lastName}`;
-        await Promise.all(admins.map((adminId) =>
+        await Promise.all(adminIds.map((adminId) =>
             notifyUser({
                 userId: adminId,
                 title: "New attendance correction request",
@@ -169,19 +182,26 @@ export const reviewCorrectionRequest = async (req, res) => {
         if (!mongoose.isValidObjectId(id)) {
             return res.status(400).json({ error: "Invalid correction request id" });
         }
-
-        const request = await AttendanceCorrection.findById(id).populate("employeeId");
-        if (!request) return res.status(404).json({ error: "Correction request not found" });
-        if (request.status !== "PENDING") {
-            return res.status(400).json({ error: "This request has already been reviewed" });
-        }
         if (!["APPROVED", "REJECTED"].includes(status)) {
             return res.status(400).json({ error: "Invalid status" });
         }
 
-        request.status = status;
-        if (typeof adminNote === "string") request.adminNote = adminNote.trim();
-        await request.save();
+        // Atomic single-review: only a still-PENDING request can be flipped, so
+        // two concurrent reviews cannot both act (one becomes a 400).
+        const request = await AttendanceCorrection.findOneAndUpdate(
+            { _id: id, status: "PENDING" },
+            { $set: { status, ...(typeof adminNote === "string" ? { adminNote: adminNote.trim() } : {}) } },
+            { new: true }
+        ).populate("employeeId");
+        if (!request) {
+            const exists = await AttendanceCorrection.exists({ _id: id });
+            return exists
+                ? res.status(400).json({ error: "This request has already been reviewed" })
+                : res.status(404).json({ error: "Correction request not found" });
+        }
+        if (!request.employeeId) {
+            return res.status(404).json({ error: "Linked employee not found" });
+        }
 
         let attendanceNote = "";
         if (status === "APPROVED") {

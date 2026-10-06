@@ -130,7 +130,12 @@ const authLimiter = rateLimit({
     limit: 30,
     message: { error: "Too many login attempts, please try again later" },
 });
-app.use("/api/auth", authLimiter);
+// Only the credential-aware endpoints get the tighter limiter; refresh,
+// logout, session and change-password are not password-guessing surfaces and
+// must not throttle legitimate users.
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/forgot-password", authLimiter);
+app.use("/api/auth/reset-password", authLimiter);
 
 // Parse multipart/form-data ONLY where it is needed (bio/image FormData).
 // Mounted after the rate limiter and with strict field limits to bound memory.
@@ -180,7 +185,14 @@ app.use((err, req, res, next) => {
 });
 
 if (!bootError) {
-    await connectDB();
+    try {
+        await connectDB();
+    } catch (error) {
+        // Keep the server alive so /api/health can still report and the readable
+        // env-diagnosis middleware works, instead of a module-load crash that
+        // Vercel would surface as a headerless 500.
+        console.error("Database connection failed:", error.message);
+    }
 }
 
 //Listening port
