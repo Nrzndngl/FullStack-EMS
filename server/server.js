@@ -170,6 +170,11 @@ app.use((req, res) => {
 
 // Global error handler - never leak internals to the client
 app.use((err, req, res, next) => {
+    // If headers were already sent (e.g. a streamed CSV partially flushed), we
+    // cannot change the status code; just close the connection.
+    if (res.headersSent) {
+        return next(err);
+    }
     if (err.message === "Not allowed by CORS") {
         return res.status(403).json({ error: "Not allowed by CORS" });
     }

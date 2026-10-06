@@ -1,5 +1,13 @@
+// Neutralize cells that start with a spreadsheet formula character so a crafted
+// value cannot execute as a formula (CSV injection) when the export is opened
+// in Excel/Sheets.
+const dangerouslyFormatted = /^[=+\-@\t\r]/;
+
 const escapeCell = (value) => {
-    const str = value == null ? "" : String(value);
+    let str = value == null ? "" : String(value);
+    if (dangerouslyFormatted.test(str)) {
+        str = `'${str}`;
+    }
     if (/[",\n\r]/.test(str)) {
         return `"${str.replace(/"/g, '""')}"`;
     }

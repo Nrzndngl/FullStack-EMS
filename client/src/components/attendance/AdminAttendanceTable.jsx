@@ -34,6 +34,8 @@ const RecordsTab = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  // Bumped after a save to refetch the current view.
+  const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState("");
   const pageSize = 20;
 
@@ -79,7 +81,7 @@ const RecordsTab = () => {
         if (fetchSerial.current === serial) setLoading(false);
       }
     })();
-  }, [fetchRecords, invalidFilter]);
+  }, [invalidFilter, page, debouncedSearch, reloadKey]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -95,7 +97,7 @@ const RecordsTab = () => {
       await api.put(`/attendance/${editing.id}/correct`, data);
       toast.success("Attendance record updated");
       setEditing(null);
-      fetchRecords();
+      setReloadKey((k) => k + 1);
     } catch (error) {
       toast.error(error?.response?.data?.error || "Failed to update record");
     } finally {
