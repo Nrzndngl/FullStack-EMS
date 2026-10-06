@@ -5,6 +5,7 @@ import EmployeeCard from "../components/EmployeeCard";
 import EmployeeForm from "../components/EmployeeForm";
 import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
+import Button from "../components/ui/Button";
 import PageHeader from "../components/ui/PageHeader";
 import api from "../api/axios";
 
@@ -18,20 +19,21 @@ const Employees = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [error, setError] = useState(null);
   const pageSize = 12;
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 350);
     return () => clearTimeout(timer);
   }, [search]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch]);
 
   const fetchEmployees = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const params = new URLSearchParams();
       params.set("page", String(page));
       params.set("pageSize", String(pageSize));
@@ -48,8 +50,10 @@ const Employees = () => {
       } else {
         setEmployees([]);
       }
-    } catch (error) {
-      console.error("Error fetching employees:", error);
+    } catch (err) {
+      setEmployees([]);
+      setTotalPages(1);
+      setError(err?.response?.data?.error || err?.message || "Failed to load employees");
     } finally {
       setLoading(false);
     }
@@ -115,6 +119,17 @@ const Employees = () => {
               </div>
             </div>
           ))}
+        </div>
+      ) : error ? (
+        <div className="card">
+          <EmptyState
+            icon={Users}
+            title="Could not load employees"
+            description={error}
+          />
+          <div className="flex justify-center pb-5">
+            <Button onClick={() => fetchEmployees()}>Retry</Button>
+          </div>
         </div>
       ) : employees.length === 0 ? (
         <div className="card">

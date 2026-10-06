@@ -5,17 +5,14 @@ import Badge from "../components/ui/Badge";
 import Card from "../components/ui/Card";
 import StatCard from "../components/ui/StatCard";
 import api from "../api/axios";
+import { formatNepalDate } from "../utils/format";
 
 const MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "NPR", maximumFractionDigits: 0 }).format(amount);
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
-};
+const formatDate = (dateStr) => formatNepalDate(dateStr);
 
 const EmployeeDetail = () => {
   const { id } = useParams();

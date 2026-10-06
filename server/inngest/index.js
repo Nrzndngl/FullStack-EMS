@@ -28,11 +28,13 @@ const autoCheckOut = inngest.createFunction(
         if (!current || !employee) return; // record or employee gone — nothing to do
 
         if (!current.checkOut) {
-            // SEND REMINDER EMAIL
-            await sendEmail({
-                to: employee.email,
-                subject: "Remember to Check-out",
-                body: `<div style="max-width: 600px;">
+            // SEND REMINDER EMAIL (best-effort: a mail failure must not fail
+            // the whole function and trigger Inngest retries)
+            try {
+                await sendEmail({
+                    to: employee.email,
+                    subject: "Remember to Check-out",
+                    body: `<div style="max-width: 600px;">
                 <h2>Hi ${employee.firstName},</h2>
                 <p style="font-size: 16px;">You have a check-in in ${employee.department} today :</p>
                 <p style="font-size: 18px; font-weight: bold; color:#007bff; margin: 8px 0;">${current?.checkIn ? new Date(current.checkIn).toLocaleTimeString() : ""}</p>
@@ -42,7 +44,10 @@ const autoCheckOut = inngest.createFunction(
                 <p style="font-size: 16px;">Best Regards,</p>
                 <p style="font-size: 16px;">EMS</p>
                 </div>`
-            })
+                })
+            } catch (err) {
+                console.error("check-out reminder email failed:", err);
+            }
 
             //AFTER 10 HRS TOTAL, FORCE CHECK-OUT
             await step.sleepUntil("wait-for-10-hours", new Date(Date.now() + 1 * 60 * 60 * 1000))
@@ -75,14 +80,17 @@ const leaveApplicationReminder = inngest.createFunction(
         // Get Leave Data
         const leaveApplication = await LeaveApplication.findById(leaveApplicationId);
 
-        if (leaveApplication.status === "PENDING") {
-            const employee = await Employee.findById(leaveApplication.employeeId)
+        if (leaveApplication && leaveApplication.status === "PENDING") {
+            const employee = await Employee.findById(leaveApplication.employeeId);
+            // Record or its employee was removed meanwhile — nothing to send.
+            if (!employee || !process.env.ADMIN_EMAIL) return;
 
             // Send Reminder Email to Manager
-            await sendEmail({
-                to: process.env.ADMIN_EMAIL,
-                subject: `Leave Application Remainder`,
-                body: `<div style="max-width: 600px;">
+            try {
+                await sendEmail({
+                    to: process.env.ADMIN_EMAIL,
+                    subject: `Leave Application Remainder`,
+                    body: `<div style="max-width: 600px;">
                 <h2>Hi Admin</h2>
                 <p style="font-size: 16px;">You have a leave application in ${employee.department} today :< /p>
                 <p style="font-size: 18px; font-weight: bold; color:#007bff; margin: 8px 0;">${leaveApplication?.startDate?.toLocaleDateString()}</p>
@@ -90,7 +98,10 @@ const leaveApplicationReminder = inngest.createFunction(
                 <p style="font-size: 16px;">Best Regards,</p>
                 <p style="font-size: 16px;">EMS</p>
                 </div>`
-            })
+                })
+            } catch (err) {
+                console.error("leave reminder email failed:", err);
+            }
         }
     }
 );
@@ -144,10 +155,11 @@ const attendanceReminderCron = inngest.createFunction(
         const absentEmployees = activeEmployees.filter((emp) =>
             !onLeaveIds.includes(emp._id) && !checkedInIds.includes(emp._id))
 
-        // Send reminder emails
+        // Send reminder emails (allSettled so one bad recipient cannot
+        // reject the whole batch and trigger a retry for everyone)
         if (absentEmployees.length > 0) {
             await step.run("send-reminder-emails", async () => {
-                const emailPromises = absentEmployees.map((emp) => {
+                const results = await Promise.allSettled(absentEmployees.map((emp) => {
                     // send email
                     return sendEmail({
                         to: emp.email,
@@ -163,10 +175,10 @@ const attendanceReminderCron = inngest.createFunction(
                         <p style="font-size: 16px;">EMS</p>
                         </div>`
                     })
-                })
-                // wait for all emails to send
-                await Promise.all(emailPromises);
-                return { emailsSent: absentEmployees.length }
+                }))
+                const failed = results.filter((r) => r.status === "rejected").length;
+                if (failed > 0) console.error(`Attendance reminder: ${failed} email(s) failed to send`);
+                return { emailsSent: absentEmployees.length - failed }
             })
         }
         return { totalActive: activeEmployees.length, onLeave: onLeaveIds.length, checkedIn: checkedInIds.length, }

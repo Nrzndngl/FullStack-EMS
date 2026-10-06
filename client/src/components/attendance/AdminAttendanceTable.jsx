@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Pencil, Search, Check, X } from "lucide-react";
 import api from "../../api/axios";
 import toast from "react-hot-toast";
@@ -34,45 +34,54 @@ const RecordsTab = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  // Bumped after a save to refetch the current view.
+  const [reloadKey, setReloadKey] = useState(0);
   const [error, setError] = useState("");
   const pageSize = 20;
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    const timer = setTimeout(() => {
+      // Settle search and page reset in ONE update so a stale request for the
+      // old page can never interleave with the new search.
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, 350);
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch]);
-
   const invalidFilter = debouncedSearch.length > 0 && !MONGO_ID.test(debouncedSearch);
 
-  const fetchRecords = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-      if (MONGO_ID.test(debouncedSearch)) params.set("employeeId", debouncedSearch);
-      const res = await api.get(`/attendance/all?${params.toString()}`);
-      setRecords(res.data?.data || []);
-      setTotal(res.data?.total || 0);
-      setTotalPages(res.data?.totalPages || 1);
-    } catch (err) {
-      setRecords([]);
-      setTotal(0);
-      setTotalPages(1);
-      setError(err?.response?.data?.error || "Failed to load attendance");
-      if (err?.response?.status !== 400) toast.error(err?.response?.data?.error || "Failed to load attendance");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, debouncedSearch]);
-
+  // Ignore stale responses when page/search changes race each other.
+  const fetchSerial = useRef(0);
   useEffect(() => {
-    if (!invalidFilter) fetchRecords();
-    else setLoading(false);
-  }, [fetchRecords, invalidFilter]);
+    if (invalidFilter) {
+      setLoading(false);
+      return;
+    }
+    const serial = ++fetchSerial.current;
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+        if (MONGO_ID.test(debouncedSearch)) params.set("employeeId", debouncedSearch);
+        const res = await api.get(`/attendance/all?${params.toString()}`);
+        if (fetchSerial.current !== serial) return;
+        setRecords(res.data?.data || []);
+        setTotal(res.data?.total || 0);
+        setTotalPages(res.data?.totalPages || 1);
+      } catch (err) {
+        if (fetchSerial.current !== serial) return;
+        setRecords([]);
+        setTotal(0);
+        setTotalPages(1);
+        setError(err?.response?.data?.error || "Failed to load attendance");
+        if (err?.response?.status !== 400) toast.error(err?.response?.data?.error || "Failed to load attendance");
+      } finally {
+        if (fetchSerial.current === serial) setLoading(false);
+      }
+    })();
+  }, [invalidFilter, page, debouncedSearch, reloadKey]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -88,7 +97,7 @@ const RecordsTab = () => {
       await api.put(`/attendance/${editing.id}/correct`, data);
       toast.success("Attendance record updated");
       setEditing(null);
-      fetchRecords();
+      setReloadKey((k) => k + 1);
     } catch (error) {
       toast.error(error?.response?.data?.error || "Failed to update record");
     } finally {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { KeyRound, ArrowLeft } from "lucide-react";
 import api from "../api/axios";
@@ -10,6 +10,14 @@ const ResetPassword = () => {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Strip the one-time reset token from the address bar as soon as the page
+  // mounts so it doesn't linger in history or get copy-pasted elsewhere.
+  useEffect(() => {
+    if (token) {
+      window.history.replaceState(null, "", "/reset-password");
+    }
+  }, [token]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

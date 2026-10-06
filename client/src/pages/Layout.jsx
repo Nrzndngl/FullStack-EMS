@@ -28,7 +28,7 @@ const Layout = () => {
             Welcome back, <span className="font-medium text-ink-900">{name.split(" ")[0]}</span>
           </p>
           <div className="flex items-center gap-5">
-            <NotificationBell />
+            <NotificationBell desktop />
             <span className="text-xs text-ink-400">
               {todayDisplay()}
             </span>

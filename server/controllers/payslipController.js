@@ -88,7 +88,7 @@ export const generateBatchPayslips = async (req, res) => {
         }
         const { start, end } = monthRangeForYearMonth(Number(year), Number(month));
 
-        const employees = await Employee.find({ isDeleted: { $ne: true } }).lean();
+        const employees = await Employee.find({ isDeleted: { $ne: true }, employmentStatus: "ACTIVE" }).lean();
         let created = 0;
         let skipped = 0;
         const errors = [];
@@ -138,7 +138,10 @@ export const generateBatchPayslips = async (req, res) => {
                 const basicSalary = Number(employee.basicSalary) || 0;
                 const allowances = Number(employee.allowances) || 0;
                 const deductions = Number(employee.deductions) || 0;
-                const overtimePay = totalOvertime ? Math.max(0, Math.round(totalOvertime * (basicSalary / (attendanceAgg || 1) / 8))) : 0;
+                // Hourly rate derives from days actually worked (PRESENT/LATE
+                // attendance), never from ABSENT placeholder rows.
+                const workedDays = workingDays || attendanceAgg || 1;
+                const overtimePay = totalOvertime ? Math.max(0, Math.round(totalOvertime * (basicSalary / workedDays / 8))) : 0;
 
                 await Payslip.create({
                     employeeId: employee._id,

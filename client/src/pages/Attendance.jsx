@@ -15,17 +15,19 @@ import api from "../api/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { downloadBlob } from "../utils/download";
-import { nepalDateKey, todayNepalKey } from "../utils/format";
+import { todayNepalKey } from "../utils/format";
 
 const Attendance = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN" || user?.role_type === "ADMIN";
   const [history, setHistory] = useState([]);
+  const [todayRecord, setTodayRecord] = useState(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [isDeleted, setIsDeleted] = useState(false);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
 
   const fetchData = useCallback(async () => {
     if (isAdmin) return;
@@ -33,6 +35,7 @@ const Attendance = () => {
       const res = await api.get(`/attendance?page=${page}&pageSize=15`);
       setHistory(res.data?.data || []);
       setTotalPages(res.data?.totalPages || 1);
+      setTotal(res.data?.total || 0);
       if (res.data?.employee?.isDeleted) setIsDeleted(true);
     } catch (error) {
       toast.error(error?.response?.data?.error || error?.message);
@@ -41,9 +44,29 @@ const Attendance = () => {
     }
   }, [page, isAdmin]);
 
+  const fetchToday = useCallback(async () => {
+    if (isAdmin) return;
+    const today = todayNepalKey();
+    try {
+      const res = await api.get(`/attendance?from=${today}&to=${today}&pageSize=1`);
+      setTodayRecord(res.data?.data?.[0] || null);
+    } catch {
+      setTodayRecord(null);
+    }
+  }, [isAdmin]);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    fetchToday();
+  }, [fetchToday]);
+
+  const refresh = useCallback(() => {
+    fetchData();
+    fetchToday();
+  }, [fetchData, fetchToday]);
 
   const exportCsv = async () => {
     setExporting(true)
@@ -57,9 +80,6 @@ const Attendance = () => {
       setExporting(false)
     }
   }
-
-  const todayKey = todayNepalKey();
-  const todayRecord = history.find((r) => nepalDateKey(r.date) === todayKey);
 
   return (
     <div className="animate-fade-in">
@@ -86,7 +106,7 @@ const Attendance = () => {
               </p>
             </div>
           ) : (
-            <CheckInButton todayRecord={todayRecord} onAction={fetchData} />
+            <CheckInButton todayRecord={todayRecord} onAction={refresh} />
           )}
 
           <AttendanceStats />
@@ -94,7 +114,7 @@ const Attendance = () => {
 
           <div className="flex items-center justify-between mb-4 mt-6">
             <h2 className="text-base font-semibold text-ink-900">Attendance History</h2>
-            {!loading && <Badge tone="ink">{history.length} records</Badge>}
+            {!loading && <Badge tone="ink">{total} records</Badge>}
           </div>
 
           {!loading && history.length === 0 ? (

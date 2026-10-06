@@ -4,6 +4,7 @@ import api from "../../api/axios";
 import toast from "react-hot-toast";
 import Modal from "../ui/Modal";
 import Button from "../ui/Button";
+import { shiftNepalKey, todayNepalKey } from "../../utils/format";
 
 const ApplyLeaveModal = ({ open, onClose, onSuccess, balances }) => {
   const [loading, setLoading] = useState(false);
@@ -12,10 +13,10 @@ const ApplyLeaveModal = ({ open, onClose, onSuccess, balances }) => {
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
 
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-  const minDate = tomorrow.toISOString().split("T")[0];
+  // Minimum selectable date = "tomorrow" in the Nepal calendar. Computing it
+  // from the browser's wall clock + local midnight would let a late-day request
+  // pick today, which the server rejects.
+  const minDate = shiftNepalKey(todayNepalKey(), 1);
 
   const countDays = (start, end) => {
     if (!start || !end) return 0;

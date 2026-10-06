@@ -2,8 +2,15 @@ import "dotenv/config";
 import connectDB from "./config/db.js";
 import User from "./models/User.js";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 
-const TemporaryPassword = "admin123";
+// Prefer an explicit ADMIN_PASSWORD (>= 12 chars); otherwise generate a random
+// one-time password. Never fall back to the widely-known "admin123" in
+// production-style seeding.
+const TemporaryPassword = process.env.ADMIN_PASSWORD || crypto.randomBytes(12).toString("hex");
+if (!process.env.ADMIN_PASSWORD) {
+    console.warn("ADMIN_PASSWORD not set; a random password was generated. It is logged below — change it after login.");
+}
 
 async function registerAdmin() {
     try {
@@ -32,11 +39,12 @@ async function registerAdmin() {
         console.log("Admin created");
         console.log("\nemail:", admin.email);
         console.log("password:", TemporaryPassword);
-        console.log("\ncange this password after login")
+        console.log("\nchange this password after login")
         process.exit(0);
 
     } catch (error) {
         console.log("Error registering admin:", error.message);
+        process.exit(1);
     }
 }
 registerAdmin();

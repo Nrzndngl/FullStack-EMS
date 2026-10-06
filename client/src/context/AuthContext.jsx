@@ -10,6 +10,7 @@ export function AuthProvider({ children }) {
 
     const refreshSession = async () => {
         const storedToken = localStorage.getItem("token")
+        setToken(storedToken)
         if (!storedToken) {
             setUser(null);
             setToken(null);
@@ -19,11 +20,15 @@ export function AuthProvider({ children }) {
         try {
             const { data } = await api.get("/auth/session")
             setUser(data.user)
-        } catch {
-            //TOKEN IS INVALID
-            localStorage.removeItem("token")
-            setUser(null)
-            setToken(null)
+            setToken(localStorage.getItem("token") || storedToken)
+        } catch (err) {
+            // Only treat auth failures as session death. A transient 500/429
+            // or network blip must not force an innocent logout.
+            if (err?.response?.status === 401 || err?.response?.status === 403) {
+                localStorage.removeItem("token")
+                setUser(null)
+                setToken(null)
+            }
         } finally {
             setLoading(false)
         }
@@ -31,6 +36,26 @@ export function AuthProvider({ children }) {
 
     useEffect(() => {
         refreshSession()
+    }, [])
+
+    // React to refresh lifecycle events emitted by the axios interceptor.
+    useEffect(() => {
+        const onExpired = () => {
+            localStorage.removeItem("token")
+            setUser(null)
+            setToken(null)
+        }
+        const onRefreshed = (e) => {
+            const { token: t, user: u } = e.detail || {}
+            setToken(t || localStorage.getItem("token"))
+            if (u) setUser(u)
+        }
+        window.addEventListener("auth:expired", onExpired)
+        window.addEventListener("auth:refreshed", onRefreshed)
+        return () => {
+            window.removeEventListener("auth:expired", onExpired)
+            window.removeEventListener("auth:refreshed", onRefreshed)
+        }
     }, [])
 
     const login = async (email, password, role_type) => {

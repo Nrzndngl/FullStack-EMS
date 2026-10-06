@@ -30,8 +30,12 @@ export const updateProfile = async (req, res) => {
     try {
         const session = req.session;
         const employee = await Employee.findOne({ userId: session.userId })
-        if (!employee)
-            return res.status(404).json({ error: "Employee not found" })
+        if (!employee) {
+            // Administrators without a linked Employee record have no persistable
+            // profile; accept the update as a no-op so the UI does not 404.
+            if (session.role === "ADMIN") return res.json({ success: true });
+            return res.status(404).json({ error: "No employee profile is linked to this account. Contact an administrator" })
+        }
         if (employee.isDeleted) {
             return res.status(403).json({ error: "Your Account is Deactivated. You cannot update your profile", })
         }

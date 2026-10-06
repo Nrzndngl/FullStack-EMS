@@ -127,7 +127,11 @@ const Setting = () => {
         </div>
       )}
 
-      {profile && <ProfileForm initialData={profile} onSuccess={fetchProfile} />}
+      {/* Only employees have a persistable profile (admins without a linked
+          Employee record get a synthetic profile from GET /profile). */}
+      {profile && !!profile?.position && (
+        <ProfileForm initialData={profile} onSuccess={fetchProfile} />
+      )}
 
       <div className="card max-w-md p-6 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">

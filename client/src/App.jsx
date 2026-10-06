@@ -16,7 +16,18 @@ import Announcements from './pages/Announcements'
 import AnnouncementDetail from './pages/AnnouncementDetail'
 import LoginForm from './components/LoginForm'
 import Dashboard from './pages/Dashboard'
+import { useAuth } from './context/AuthContext'
 
+
+const RequireRole = ({ roles, children }) => {
+  const { user, loading } = useAuth()
+  if (loading) return null
+  const role = user?.role || user?.role_type
+  if (!role || !roles.includes(role)) {
+    return <Navigate to="/dashboard" replace />
+  }
+  return children
+}
 
 const App = () => {
   return (
@@ -34,14 +45,14 @@ const App = () => {
       <Route element = {<Layout />}>
         <Route path='/dashboard' element={<Dashboard />} />
         <Route path='/attendance' element={<Attendance />} />
-        <Route path='/employees' element={<Employees />} />
-        <Route path='/employees/:id' element={<EmployeeDetail />} />
         <Route path='/leave' element={<Leave />} />
-        <Route path='/payslips' element={<Payslips />} />
         <Route path='/setting' element={<Setting />} />
-        <Route path='/audit' element={<AuditLog />} />
         <Route path='/announcements' element={<Announcements />} />
         <Route path='/announcements/:id' element={<AnnouncementDetail />} />
+        <Route path='/payslips' element={<Payslips />} />
+        <Route path='/employees' element={<RequireRole roles={["ADMIN"]}><Employees /></RequireRole>} />
+        <Route path='/employees/:id' element={<RequireRole roles={["ADMIN"]}><EmployeeDetail /></RequireRole>} />
+        <Route path='/audit' element={<RequireRole roles={["ADMIN"]}><AuditLog /></RequireRole>} />
       </Route>
       <Route path='/print/payslips/:id' element={<PrintPayslip />} />
 

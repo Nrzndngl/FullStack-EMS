@@ -32,17 +32,22 @@ export const createLeave = async (req, res) => {
         }
 
         // Normalize + validate using Nepal calendar days
-        const startKey = nepalDateKey(new Date(startDate));
-        const endKey = nepalDateKey(new Date(endDate));
-        if (startKey <= nepalDateKey() || endKey <= nepalDateKey()) {
-            return res.status(400).json({
-                error: "Leave dates must be in the future"
-            });
+        const startDateObj = new Date(startDate);
+        const endDateObj = new Date(endDate);
+        if (Number.isNaN(startDateObj.getTime()) || Number.isNaN(endDateObj.getTime())) {
+            return res.status(400).json({ error: "Invalid leave dates" });
         }
+        const startKey = nepalDateKey(startDateObj);
+        const endKey = nepalDateKey(endDateObj);
 
         if (endKey < startKey) {
             return res.status(400).json({
                 error: "End Date cannot be before start date"
+            });
+        }
+        if (startKey <= nepalDateKey()) {
+            return res.status(400).json({
+                error: "Leave dates must be in the future"
             });
         }
 
@@ -55,6 +60,20 @@ export const createLeave = async (req, res) => {
             });
         }
 
+        // Reject overlapping pending/approved applications so the same calendar
+        // days cannot be submitted (and later approved) twice.
+        const newStart = dayRangeForDateKey(startKey).start;
+        const newEnd = dayRangeForDateKey(endKey).start;
+        const overlapping = await LeaveApplication.findOne({
+            employeeId: employee._id,
+            status: { $in: ["PENDING", "APPROVED"] },
+            startDate: { $lte: newEnd },
+            endDate: { $gte: newStart },
+        });
+        if (overlapping) {
+            return res.status(400).json({ error: "You already have a pending or approved leave for an overlapping period" });
+        }
+
         const leave = await LeaveApplication.create({
             employeeId: employee._id,
             type,
@@ -64,12 +83,19 @@ export const createLeave = async (req, res) => {
             status: "PENDING",
         })
 
-        await inngest.send({
-            name: "leave/pending",
-            data: {
-                leaveApplicationId: leave._id,
-            },
-        })
+        try {
+            await inngest.send({
+                name: "leave/pending",
+                data: {
+                    leaveApplicationId: leave._id,
+                },
+            })
+        } catch (err) {
+            // Fire-and-forget: a dead Inngest client must never turn a
+            // successful leave application into a 500 (which would trigger
+            // a duplicate-application retry on the client).
+            console.error("inngest send failed (leave apply):", err);
+        }
 
         // Notify admins about the new pending leave application
         const admins = await User.find({ role: "ADMIN" }).select("_id").lean();
@@ -173,15 +199,8 @@ export const updateLeaveStatus = async (req, res) => {
                 nepalDateKey(leave.startDate),
                 nepalDateKey(leave.endDate)
             ));
-
-            // Never approve into a negative balance.
-            const employee = await Employee.findById(leave.employeeId).select("leaveBalance").lean();
-            const balance = employee?.leaveBalance?.[leave.type];
-            if (balance != null && days > balance) {
-                return res.status(400).json({
-                    error: `Insufficient ${leave.type} leave balance (${days} required, ${balance} remaining) — cannot approve`,
-                });
-            }
+            // Reverting to this status if the floor check below fails.
+            const prevStatus = leave.status;
 
             // Atomic transition so two concurrent approvals cannot double-deduct.
             const updated = await LeaveApplication.findOneAndUpdate(
@@ -196,11 +215,25 @@ export const updateLeaveStatus = async (req, res) => {
             }
             leave = updated;
 
-            await Employee.updateOne(
-                { _id: leave.employeeId },
+            // Deduct atomically with a floor: never approve into a negative
+            // balance, even when two different leaves race for the same days.
+            const result = await Employee.updateOne(
+                { _id: leave.employeeId, [`leaveBalance.${leave.type}`]: { $gte: days } },
                 { $inc: { [`leaveBalance.${leave.type}`]: -days } }
             );
+            if (result.modifiedCount !== 1) {
+                await LeaveApplication.updateOne(
+                    { _id: id },
+                    { $set: { status: prevStatus } }
+                );
+                const balance = (await Employee.findById(leave.employeeId)
+                    .select(`leaveBalance.${leave.type}`).lean())?.leaveBalance?.[leave.type];
+                return res.status(400).json({
+                    error: `Insufficient ${leave.type} leave balance (${days} required, ${balance ?? 0} remaining) — cannot approve`,
+                });
+            }
         } else {
+            const previouslyApproved = leave.status === "APPROVED";
             const updated = await LeaveApplication.findOneAndUpdate(
                 { _id: id },
                 { $set: { status } },
@@ -208,6 +241,19 @@ export const updateLeaveStatus = async (req, res) => {
             );
             if (!updated) return res.status(404).json({ error: "Leave not found" });
             leave = updated;
+
+            // Rejecting an approved leave must return the days that were
+            // deducted on approval, so re-approving later cannot charge twice.
+            if (previouslyApproved && status === "REJECTED") {
+                const days = Math.max(1, daysBetweenNepalKeys(
+                    nepalDateKey(leave.startDate),
+                    nepalDateKey(leave.endDate)
+                ));
+                await Employee.updateOne(
+                    { _id: leave.employeeId },
+                    { $inc: { [`leaveBalance.${leave.type}`]: days } }
+                );
+            }
         }
 
         await recordAudit({

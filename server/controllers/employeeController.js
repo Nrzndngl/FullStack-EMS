@@ -97,20 +97,21 @@ export const createEmployee = async (req, res) => {
         }
 
         const hashed = await bcrypt.hash(password, 10)
+        const normEmail = String(email).trim().toLowerCase();
         const user = await User.create({
-            email,
+            email: normEmail,
             password: hashed,
             role: role || "EMPLOYEE",
             name: `${firstName} ${lastName}`.trim()
         })
 
-        let createdUserId = null;
+        let employee;
         try {
-            const employee = await Employee.create({
+            employee = await Employee.create({
                 userId: user._id,
                 firstName,
                 lastName,
-                email,
+email: normEmail,
                 phone,
                 position,
                 department: department || "Engineering",
@@ -162,12 +163,36 @@ export const updateEmployee = async (req, res) => {
             return res.status(404).json({ error: "Employee not found" })
         }
 
+        // Reject impossible dates instead of persisting Invalid Date objects.
+        if (joinDate !== undefined && joinDate !== null && joinDate !== "") {
+            const parsedJoinDate = new Date(joinDate);
+            if (Number.isNaN(parsedJoinDate.getTime())) {
+                return res.status(400).json({ error: "Invalid joinDate" });
+            }
+        }
+
+        // Email is stored in two collections (User = auth source of truth,
+        // Employee = profile). Pre-check both so a change cannot update one side
+        // and fail with E11000 on the other, leaving them out of sync.
+        if (email !== undefined && email !== null && email !== "") {
+            const normEmail = String(email).trim().toLowerCase();
+            if (normEmail !== employee.email) {
+                const [dupEmployee, dupUser] = await Promise.all([
+                    Employee.exists({ email: normEmail, _id: { $ne: id } }),
+                    User.exists({ email: normEmail, _id: { $ne: employee.userId } }),
+                ]);
+                if (dupEmployee || dupUser) {
+                    return res.status(400).json({ error: "Email already exists" });
+                }
+            }
+        }
+
         // Only touch the fields that were actually provided. Using `|| 0`
         // defaults here would silently zero salaries or reset departments.
         const fields = {};
         if (firstName !== undefined) fields.firstName = firstName;
         if (lastName !== undefined) fields.lastName = lastName;
-        if (email !== undefined) fields.email = email;
+        if (email !== undefined) fields.email = String(email).trim().toLowerCase();
         if (phone !== undefined) fields.phone = phone;
         if (position !== undefined) fields.position = position;
         if (department !== undefined) fields.department = department;
@@ -177,7 +202,7 @@ export const updateEmployee = async (req, res) => {
         if (employmentStatus !== undefined) fields.employmentStatus = employmentStatus;
         if (bio !== undefined) fields.bio = bio;
         if (image !== undefined) fields.image = image;
-        if (joinDate !== undefined) fields.joinDate = new Date(joinDate);
+        if (joinDate !== undefined && joinDate !== null && joinDate !== "") fields.joinDate = new Date(joinDate);
 
         if (Object.keys(fields).length) {
             await Employee.findByIdAndUpdate(id, { $set: fields });
@@ -185,7 +210,7 @@ export const updateEmployee = async (req, res) => {
 
         // UPDATE USER RECORD
         const userUpdate = {};
-        if (email !== undefined) userUpdate.email = email;
+        if (email !== undefined) userUpdate.email = String(email).trim().toLowerCase();
         if (role !== undefined) userUpdate.role = role;
         if (password) userUpdate.password = await bcrypt.hash(password, 10);
         if (firstName !== undefined || lastName !== undefined) userUpdate.name = `${firstName ?? employee.firstName} ${lastName ?? employee.lastName}`.trim();

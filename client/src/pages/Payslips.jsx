@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from "react"
+import { useCallback, useState, useEffect, useRef } from "react"
 import Loading from "../components/Loading"
 import PayslipList from "../components/payslip/PayslipList"
 import GeneratePayslipForm from "../components/payslip/GeneratePayslipForm"
@@ -22,15 +22,20 @@ const Payslips = () => {
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN' || user?.role_type === 'ADMIN'
 
+  // Serial guard so rapid page changes never paint an older page's rows.
+  const fetchSerial = useRef(0);
   const fetchPayslips = useCallback(async () => {
+    const serial = ++fetchSerial.current;
     try {
       const res = await api.get(`/payslips?page=${page}&pageSize=10`)
+      if (fetchSerial.current !== serial) return;
       setPayslips(res.data.data || [])
       setTotalPages(res.data.totalPages || 1)
     } catch (error) {
+      if (fetchSerial.current !== serial) return;
       toast.error(error?.response?.data?.error || error?.message)
     } finally {
-      setLoading(false)
+      if (fetchSerial.current === serial) setLoading(false)
     }
   }, [page])
 

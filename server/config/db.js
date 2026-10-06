@@ -1,8 +1,14 @@
 import mongoose from "mongoose";
 import dns from "node:dns";
 
-// Set DNS servers to Cloudflare and Google to resolve MongoDB SRV records properly
-dns.setServers(["1.1.1.1", "8.8.8.8"]);
+// Use Cloudflare/Google resolvers to work around broken SRV lookups on some
+// hosts. Guarded so an environment that disallows overriding the resolver pool
+// cannot crash module load.
+try {
+    dns.setServers(["1.1.1.1", "8.8.8.8"]);
+} catch (err) {
+    console.warn("Could not override DNS servers:", err.message);
+}
 
 const connectDB = async () => {
     try {

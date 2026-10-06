@@ -24,6 +24,11 @@ const ChangePasswordModal = ({ open, onClose }) => {
     try {
       const { data } = await api.put("/auth/change-password", { currentPassword, newPassword });
       if (!data.success) throw new Error(data.error || "Failed");
+      // The server rotated tokens on password change - apply the fresh access
+      // token immediately so the just-rotated session keeps working.
+      if (data.token && data.user) {
+        window.dispatchEvent(new CustomEvent("auth:refreshed", { detail: { token: data.token, user: data.user } }));
+      }
       setMessage({ type: "success", text: "Password changed successfully!" });
       e.target.reset();
     } catch (error) {

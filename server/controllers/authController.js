@@ -45,13 +45,22 @@ const refreshCookieOptions = () => ({
 
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
 
+// Equal-response dummy hash so bcrypt timing does not reveal whether an email
+// is registered (compare against this when no user is found).
+const DUMMY_HASH = bcrypt.hashSync(`dummy-${Date.now()}`, 10);
+
 // LOGIN FOR EMPLOYEE AND ADMIN
 export const login = async (req, res) => {
     try {
         const { email, password, role_type } = req.body;
 
         const user = await User.findOne({ email }).select("+password");
-        if (!user) {
+
+        // Verify the password before ANY account-state check so an unauthenticated
+        // caller cannot distinguish registered/unregistered or active/inactive
+        // emails or learn the account role (timing is equalized via DUMMY_HASH).
+        const isValid = await bcrypt.compare(password, user?.password || DUMMY_HASH);
+        if (!user || !isValid) {
             return res.status(401).json({ error: "Invalid Credentials" });
         }
         if (!user.isActive) {
@@ -71,13 +80,11 @@ export const login = async (req, res) => {
             }
         }
 
-        const isValid = await bcrypt.compare(password, user.password);
-        if (!isValid) {
-            return res.status(401).json({ error: "Invalid Credentials" });
-        }
-
         const accessToken = signAccessToken(user);
         const refreshToken = signRefreshToken(user);
+
+        // Track the issued refresh token so `/refresh` can enforce rotation.
+        await User.updateOne({ _id: user._id }, { refreshTokenHash: sha256(refreshToken) });
 
         res.cookie("refreshToken", refreshToken, refreshCookieOptions());
         return res.json({ user: buildPayload(user), token: accessToken });
@@ -107,14 +114,30 @@ export const refresh = async (req, res) => {
             return res.status(401).json({ error: "Unauthorized" });
         }
 
-        const user = await User.findById(payload.userId).select("role isActive tokenVersion name email");
+        const user = await User.findById(payload.userId).select("role isActive tokenVersion name email refreshTokenHash");
         if (!user || !user.isActive) return res.status(401).json({ error: "Unauthorized" });
         if (user.tokenVersion !== payload.tokenVersion) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+        // Rotation: only the most recently issued refresh token is accepted.
+        // An older (stolen/reused) token is rejected once it stops matching.
+        if (!user.refreshTokenHash || user.refreshTokenHash !== sha256(token)) {
             return res.status(401).json({ error: "Unauthorized" });
         }
 
         const accessToken = signAccessToken(user);
         const refreshToken = signRefreshToken(user);
+
+        // Atomically swap the stored hash so a concurrent request using the old
+        // token cannot also succeed (one of the two is forced to re-login).
+        const swapped = await User.findOneAndUpdate(
+            { _id: user._id, refreshTokenHash: sha256(token), tokenVersion: payload.tokenVersion },
+            { $set: { refreshTokenHash: sha256(refreshToken) } }
+        );
+        if (!swapped) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+
         res.cookie("refreshToken", refreshToken, refreshCookieOptions());
 
         return res.json({ user: buildPayload(user), token: accessToken });
@@ -185,11 +208,12 @@ export const changePassword = async (req, res) => {
         }
 
         const hashed = await bcrypt.hash(newPassword, 10);
-        await User.updateOne({ _id: user._id }, { password: hashed, $inc: { tokenVersion: 1 } });
+        await User.updateOne({ _id: user._id }, { password: hashed, $inc: { tokenVersion: 1 }, $unset: { refreshTokenHash: 1 } });
 
         const fresh = await User.findById(user._id).select("role isActive tokenVersion name email");
         const accessToken = signAccessToken(fresh);
         const refreshToken = signRefreshToken(fresh);
+        await User.updateOne({ _id: fresh._id }, { refreshTokenHash: sha256(refreshToken) });
         res.cookie("refreshToken", refreshToken, refreshCookieOptions());
 
         return res.json({ success: true, token: accessToken, user: buildPayload(fresh) })
@@ -212,14 +236,9 @@ export const forgotPassword = async (req, res) => {
         const token = crypto.randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-        await User.updateOne(user._id, {
-            resetPasswordToken: sha256(token),
-            resetPasswordExpires: expiresAt,
-        });
-
-        const resetUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/reset-password?token=${token}`;
-
-        if (process.env.SMTP_USER && process.env.SMTP_PASS && process.env.SENDER_EMAIL) {
+        const smtpConfigured = process.env.SMTP_USER && process.env.SMTP_PASS && process.env.SENDER_EMAIL;
+        if (smtpConfigured) {
+            const resetUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/reset-password?token=${token}`;
             try {
                 await sendEmail({
                     to: user.email,
@@ -237,14 +256,21 @@ export const forgotPassword = async (req, res) => {
                         </div>
                     `,
                 });
+                // Persist the token ONLY once the email was accepted for delivery,
+                // so a dead SMTP config can never leave a non-sendable token on
+                // the record (an attacker could otherwise burn a unique one).
+                await User.updateOne({ _id: user._id }, {
+                    resetPasswordToken: sha256(token),
+                    resetPasswordExpires: expiresAt,
+                });
             } catch (err) {
                 console.error("Forgot password email error:", err);
-                // Revoke the token but still return the generic message - the
-                // token must NOT be handed back to the caller.
-                await User.updateOne(user._id, { resetPasswordToken: null, resetPasswordExpires: null });
+                await User.updateOne({ _id: user._id }, { resetPasswordToken: null, resetPasswordExpires: null });
             }
         } else {
             console.warn("SMTP is not configured; password reset emails are not being sent.");
+            // Do not store a token we cannot deliver.
+            await User.updateOne({ _id: user._id }, { resetPasswordToken: null, resetPasswordExpires: null });
         }
 
         return res.json({ success: true, message: "If that email exists, a reset link has been sent." });
@@ -267,12 +293,15 @@ export const resetPassword = async (req, res) => {
         }
 
         const hashed = await bcrypt.hash(newPassword, 10);
-        await User.updateOne(user._id, {
-            password: hashed,
-            resetPasswordToken: null,
-            resetPasswordExpires: null,
-            $inc: { tokenVersion: 1 },
-        });
+        // Atomic single-use consume: only the owner of a still-valid token is matched,
+        // and the token is wiped in the same operation so it can never be replayed.
+        const updated = await User.findOneAndUpdate(
+            { _id: user._id, resetPasswordToken: sha256(token), resetPasswordExpires: { $gt: new Date() } },
+            { password: hashed, resetPasswordToken: null, resetPasswordExpires: null, $inc: { tokenVersion: 1 } },
+        );
+        if (!updated) {
+            return res.status(400).json({ error: "Invalid or expired reset token" });
+        }
 
         return res.json({ success: true, message: "Password updated. You can now log in." });
     } catch (error) {

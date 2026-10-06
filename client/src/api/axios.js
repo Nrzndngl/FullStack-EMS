@@ -1,7 +1,10 @@
 import axios from "axios";
 
 const api = axios.create({
-    baseURL: (import.meta.env.VITE_BASE_URL || "http://localhost:4000") + "/api",
+    // Default to a same-origin "/api" so the app keeps working without a
+    // build-time env var and the refresh cookie stays first-party. Override
+    // with VITE_BASE_URL only in deployments that call the API cross-origin.
+    baseURL: (import.meta.env.VITE_BASE_URL || "") + "/api",
     withCredentials: true,
 });
 
@@ -37,10 +40,16 @@ api.interceptors.response.use(
                 refreshing = null;
                 localStorage.setItem("token", data.token);
                 config.headers.Authorization = `Bearer ${data.token}`;
+                // Keep AuthContext in sync so role/photo/tokenVersion changes
+                // from the refresh response are reflected without a reload.
+                window.dispatchEvent(new CustomEvent("auth:refreshed", { detail: { token: data.token, user: data.user } }));
                 return api(config);
             } catch {
                 refreshing = null;
                 localStorage.removeItem("token");
+                // The live in-memory session must die too, or every subsequent
+                // call 401s and burns the refresh limiter with no redirect.
+                window.dispatchEvent(new CustomEvent("auth:expired"));
             }
         }
         return Promise.reject(error);
