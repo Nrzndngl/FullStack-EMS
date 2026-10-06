@@ -16,7 +16,7 @@ import StatCard from "./ui/StatCard";
 import PageHeader from "./ui/PageHeader";
 import Card from "./ui/Card";
 import Avatar from "./ui/Avatar";
-import { formatNPR, formatDisplayDate } from "../utils/format";
+import { formatNPR, formatDisplayDate, formatNepalDate } from "../utils/format";
 import api from "../api/axios.js";
 
 const LEAVE_LABELS = {
@@ -236,7 +236,7 @@ const EmployeeDashboard = ({ data }) => {
                   <p className="text-sm text-ink-600 mt-0.5 line-clamp-2 whitespace-pre-wrap">{a.body}</p>
                   <p className="text-xs text-ink-400 mt-1">
                     {a.author?.name || a.author?.email || "Admin"} ·{" "}
-                    {new Date(a.createdAt).toLocaleDateString()} · View →
+                    {formatNepalDate(a.createdAt)} · View →
                   </p>
                 </div>
               </Link>

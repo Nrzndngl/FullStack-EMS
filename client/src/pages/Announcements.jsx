@@ -10,6 +10,7 @@ import Modal from "../components/ui/Modal";
 import EmptyState from "../components/ui/EmptyState";
 import Loading from "../components/Loading";
 import { useAuth } from "../context/AuthContext";
+import { formatNepalDate } from "../utils/format";
 
 const Announcements = () => {
   const { user, loading: authLoading } = useAuth();
@@ -114,7 +115,7 @@ const Announcements = () => {
                   <p className="text-sm text-ink-600 mt-1 line-clamp-2 whitespace-pre-wrap">{a.body}</p>
                   <p className="text-xs text-ink-400 mt-2">
                     {a.author?.name || a.author?.email || "Admin"} ·{" "}
-                    {new Date(a.createdAt).toLocaleDateString()} · <Link to={`/announcements/${a.id}`} className="text-primary-600 hover:underline">View →</Link>
+                    {formatNepalDate(a.createdAt)} · <Link to={`/announcements/${a.id}`} className="text-primary-600 hover:underline">View →</Link>
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">

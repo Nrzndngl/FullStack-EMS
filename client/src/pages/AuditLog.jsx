@@ -5,6 +5,7 @@ import EmptyState from "../components/ui/EmptyState";
 import Card from "../components/ui/Card";
 import Badge from "../components/ui/Badge";
 import api from "../api/axios";
+import { formatNepalDateTime } from "../utils/format";
 
 const ENTITY_COLORS = {
   EMPLOYEE: "primary",
@@ -31,16 +32,7 @@ const ACTION_COLORS = {
 
 const actionTone = (action) => ACTION_COLORS[action] || "ink";
 
-const formatTime = (iso) => {
-  const d = new Date(iso);
-  return d.toLocaleString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
+const formatTime = (iso) => formatNepalDateTime(iso);
 
 const AuditLog = () => {
   const [logs, setLogs] = useState([]);

@@ -3,12 +3,24 @@ import { Bell, BellRing, CheckCheck } from "lucide-react";
 import api from "../api/axios";
 import { Link } from "react-router-dom";
 
-const NotificationBell = () => {
+const NotificationBell = ({ desktop = false }) => {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [enabled, setEnabled] = useState(false);
   const dropRef = useRef(null);
+
+  // Two bells are mounted at once (desktop header + mobile top bar, one hidden
+  // by CSS). Only the one actually visible on the current viewport polls, so we
+  // never issue duplicate requests.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const update = () => setEnabled(mq.matches === desktop);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, [desktop]);
 
   const fetchNotifications = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -24,10 +36,11 @@ const NotificationBell = () => {
   };
 
   useEffect(() => {
+    if (!enabled) return;
     fetchNotifications(true);
     const interval = setInterval(() => fetchNotifications(true), 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -43,7 +56,9 @@ const NotificationBell = () => {
     try {
       await api.put(`/notifications/${id}/read`);
     } catch {
-      // ignore
+      // Revert the optimistic update so the UI matches the server state.
+      setNotifications((prev) => prev.map((n) => (n._id === id || n.id === id ? { ...n, read: false } : n)));
+      setUnread((u) => u + 1);
     }
   };
 
@@ -53,7 +68,7 @@ const NotificationBell = () => {
     try {
       await api.put("/notifications/read-all");
     } catch {
-      // ignore
+      fetchNotifications(true);
     }
   };
 
