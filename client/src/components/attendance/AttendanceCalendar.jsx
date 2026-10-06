@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import api from "../../api/axios";
 import { formatDisplayDate, nepalDateKey, dateFromNepalKey } from "../../utils/format";
@@ -44,27 +44,30 @@ const AttendanceCalendar = () => {
   const from = `${year}-${pad(month)}-01`;
   const to = `${year}-${pad(month)}-${pad(monthDays(year, month))}`;
 
-  const fetchMonth = useCallback(async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams({ from, to, pageSize: "200", page: "1" });
-      const [att, h1, h2] = await Promise.all([
-        api.get(`/attendance?${params.toString()}`),
-        api.get(`/holidays?year=${year}`),
-        api.get(`/holidays?year=${year + 1}`),
-      ]);
-      setRecords(att.data?.data || []);
-      setHolidays([...(h1.data?.data || []), ...(h2.data?.data || [])]);
-    } catch {
-      setRecords([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [from, to, year]);
-
+  // Drop stale responses: a fast month-toggle must never paint records from a
+  // month the user has already navigated away from.
+  const fetchSerial = useRef(0);
   useEffect(() => {
-    fetchMonth();
-  }, [fetchMonth]);
+    const serial = ++fetchSerial.current;
+    (async () => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams({ from, to, pageSize: "200", page: "1" });
+        const [att, h1, h2] = await Promise.all([
+          api.get(`/attendance?${params.toString()}`),
+          api.get(`/holidays?year=${year}`),
+          api.get(`/holidays?year=${year + 1}`),
+        ]);
+        if (fetchSerial.current !== serial) return;
+        setRecords(att.data?.data || []);
+        setHolidays([...(h1.data?.data || []), ...(h2.data?.data || [])]);
+      } catch {
+        if (fetchSerial.current === serial) setRecords([]);
+      } finally {
+        if (fetchSerial.current === serial) setLoading(false);
+      }
+    })();
+  }, [from, to, year]);
 
   const recordByKey = {};
   records.forEach((r) => {
