@@ -2,7 +2,7 @@ import { Inngest } from "inngest";
 import Attendance from "../models/Attendance.js";
 import Employee from "../models/Employee.js";
 import LeaveApplication from "../models/LeaveApplication.js";
-import { nepalDateKey } from "../utils/time.js";
+import { nepalDateKey, computeAttendanceMetrics } from "../utils/time.js";
 import sendEmail from "../config/nodemailer.js";
 
 // Create a client to send and receive events
@@ -58,9 +58,17 @@ const autoCheckOut = inngest.createFunction(
                 if (!attendance.checkIn) {
                     attendance.checkIn = attendance.date || nepalDayStart();
                 }
+                // A missed check-out is credited as a partial (penalty) day, with
+                // the hours measured against the 09:00-17:00 shift.
                 attendance.checkOut = new Date(new Date(attendance.checkIn).getTime() + 4 * 60 * 60 * 1000);
-                attendance.workingHours = 4;
-                attendance.dayType = "Half Day";
+                const { workingHours, overtimeHours, dayType } = computeAttendanceMetrics(
+                    attendance.checkIn,
+                    attendance.checkOut,
+                    nepalDateKey(attendance.date)
+                );
+                attendance.workingHours = workingHours;
+                attendance.overtimeHours = overtimeHours;
+                attendance.dayType = dayType;
                 attendance.status = "LATE";
                 await attendance.save();
             }

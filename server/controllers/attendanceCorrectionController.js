@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import Employee from "../models/Employee.js";
 import User from "../models/User.js";
 import AttendanceCorrection from "../models/AttendanceCorrection.js";
-import { nepalDateKey, startOfNepalDay, dayRangeForDateKey } from "../utils/time.js";
+import { nepalDateKey, startOfNepalDay, dayRangeForDateKey, computeAttendanceMetrics, isLateCheckIn } from "../utils/time.js";
 import { recordAudit } from "../utils/audit.js";
 import { notifyUser } from "./notificationController.js";
 
@@ -13,19 +13,15 @@ const STATUS_LABEL = {
 };
 
 const recomputeHours = (record) => {
-    const start = record.checkIn ? new Date(record.checkIn).getTime() : null;
-    const end = record.checkOut ? new Date(record.checkOut).getTime() : null;
-    if (start != null && end != null && !Number.isNaN(start) && !Number.isNaN(end)) {
-        const hours = Math.min(24, Math.max(0, (end - start) / (1000 * 60 * 60)));
-        record.workingHours = parseFloat(hours.toFixed(2));
-        const STANDARD_HOURS = 8;
-        record.overtimeHours = record.workingHours > STANDARD_HOURS
-            ? parseFloat((record.workingHours - STANDARD_HOURS).toFixed(2))
-            : 0;
-        if (record.workingHours >= 8) record.dayType = "Full Day";
-        else if (record.workingHours >= 6) record.dayType = "Three Quarter Day";
-        else if (record.workingHours >= 4) record.dayType = "Half Day";
-        else record.dayType = "Short Day";
+    if (record.checkIn && record.checkOut) {
+        const metrics = computeAttendanceMetrics(
+            record.checkIn,
+            record.checkOut,
+            nepalDateKey(record.date)
+        );
+        record.workingHours = metrics.workingHours;
+        record.overtimeHours = metrics.overtimeHours;
+        record.dayType = metrics.dayType;
     }
     return record;
 };
@@ -222,7 +218,10 @@ export const reviewCorrectionRequest = async (req, res) => {
             // Apply the requested timing and mark it as corrected
             if (request.checkIn) record.checkIn = new Date(request.checkIn);
             if (request.checkOut) record.checkOut = new Date(request.checkOut);
-            record.status = record.status === "ABSENT" ? "PRESENT" : record.status || "PRESENT";
+            // Status follows the 09:00 shift start + grace, like a normal check-in.
+            record.status = record.checkIn
+                ? (isLateCheckIn(record.checkIn, nepalDateKey(record.date)) ? "LATE" : "PRESENT")
+                : (record.status || "PRESENT");
             recomputeHours(record);
             await record.save();
             attendanceNote = " and your attendance record was updated";
