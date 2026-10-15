@@ -2,7 +2,13 @@ import { inngest } from "../inngest/index.js";
 import mongoose from "mongoose";
 import Attendance from "../models/Attendance.js";
 import Employee from "../models/Employee.js";
-import { nepalNowTime, startOfNepalDay, nepalDateKey, dayRangeForDateKey } from "../utils/time.js";
+import {
+    startOfNepalDay,
+    nepalDateKey,
+    dayRangeForDateKey,
+    isLateCheckIn,
+    computeAttendanceMetrics,
+} from "../utils/time.js";
 import { recordAudit } from "../utils/audit.js";
 import { queryId, queryDate, queryEnum } from "../validators/index.js";
 
@@ -37,9 +43,8 @@ export const clockInOut = async (req, res) => {
 
         // No record yet -> CHECK IN
         if (!existing) {
-            // Nepal-aware late check (after 9:00 AM Asia/Kathmandu)
-            const { hour, minute } = nepalNowTime();
-            const isLate = hour > 9 || (hour === 9 && minute > 0);
+            // Nepal-aware late check (after office start + grace, Asia/Kathmandu)
+            const isLate = isLateCheckIn(now);
             const attendance = await Attendance.create({
                 employeeId: employee._id,
                 date: today,
@@ -67,26 +72,16 @@ export const clockInOut = async (req, res) => {
 
         // Record exists but no check-out -> CHECK OUT
         if (!existing.checkOut) {
-            const nowTs = now.getTime();
             // Guard against legacy records with a null/missing checkIn so the
-            // computed hours can never be NaN / explode into millions of hours.
-            const checkInTime = existing.checkIn ? new Date(existing.checkIn).getTime() : nowTs;
-            const diffHours = Math.max(0, (nowTs - checkInTime) / (1000 * 60 * 60));
+            // credited window can never be NaN.
+            if (!existing.checkIn) existing.checkIn = now;
 
             existing.checkOut = now;
 
-            // COMPUTE WORKING HOURS & DAY TYPE (clamped to a sane 0-24h window)
-            const workingHours = parseFloat(Math.min(24, diffHours).toFixed(2));
-            const STANDARD_HOURS = 8;
-            const overtimeHours = workingHours > STANDARD_HOURS
-                ? parseFloat((workingHours - STANDARD_HOURS).toFixed(2))
-                : 0;
-
-            let dayType = "Half Day"
-            if (workingHours >= 8) dayType = "Full Day"
-            else if (workingHours >= 6) dayType = "Three Quarter Day"
-            else if (workingHours >= 4) dayType = "Half Day"
-            else dayType = "Short Day";
+            // Credit only time inside the 09:00-17:00 shift; time after 17:00
+            // is overtime. Day type follows the credited hours.
+            const { workingHours, overtimeHours, dayType } =
+                computeAttendanceMetrics(existing.checkIn, now, nepalDateKey(existing.date));
 
             existing.workingHours = workingHours;
             existing.overtimeHours = overtimeHours;
@@ -227,23 +222,20 @@ export const correctAttendance = async (req, res) => {
         if (status && ["PRESENT", "ABSENT", "LATE"].includes(status)) record.status = status;
         if (dayType && ["Full Day", "Three Quarter Day", "Half Day", "Short Day"].includes(dayType)) record.dayType = dayType;
 
-        // Recompute working hours + overtime + day type whenever both times exist.
-        // Null checkIn can never produce NaN: fall back to 0 hours.
+        // Recompute credited hours + overtime + day type whenever both times exist.
+        // A null checkIn can never produce NaN: metrics fall back to 0 hours.
         if (record.checkIn && record.checkOut) {
-            const diffMs = Math.max(0, new Date(record.checkOut).getTime() - new Date(record.checkIn).getTime());
-            const hours = Math.min(24, diffMs / (1000 * 60 * 60));
-            record.workingHours = parseFloat(hours.toFixed(2));
-            const STANDARD_HOURS = 8;
-            record.overtimeHours = record.workingHours > STANDARD_HOURS
-                ? parseFloat((record.workingHours - STANDARD_HOURS).toFixed(2))
-                : 0;
+            const metrics = computeAttendanceMetrics(
+                record.checkIn,
+                record.checkOut,
+                nepalDateKey(record.date)
+            );
+            record.workingHours = metrics.workingHours;
+            record.overtimeHours = metrics.overtimeHours;
 
+            // An explicit, valid day type from the admin wins; otherwise derive it.
             if (!dayType || !["Full Day", "Three Quarter Day", "Half Day", "Short Day"].includes(dayType)) {
-                let computed = "Short Day";
-                if (record.workingHours >= 8) computed = "Full Day";
-                else if (record.workingHours >= 6) computed = "Three Quarter Day";
-                else if (record.workingHours >= 4) computed = "Half Day";
-                record.dayType = computed;
+                record.dayType = metrics.dayType;
             }
         }
 

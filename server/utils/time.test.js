@@ -6,6 +6,9 @@ import {
     nepalNowTime,
     daysBetweenNepalKeys,
     isFutureInNepal,
+    nepalInstant,
+    isLateCheckIn,
+    computeAttendanceMetrics,
 } from "./time.js";
 
 describe("nepalDateKey", () => {
@@ -61,5 +64,61 @@ describe("isFutureInNepal", () => {
     });
     it("is true for a date far in the future", () => {
         expect(isFutureInNepal(new Date("2099-01-01T00:00:00Z"))).toBe(true);
+    });
+});
+
+describe("nepalInstant", () => {
+    it("maps a Nepal wall-clock time to the correct UTC instant", () => {
+        expect(nepalInstant("2026-09-02", "09:00").toISOString()).toBe("2026-09-02T03:15:00.000Z");
+        expect(nepalInstant("2026-09-02", "17:00").toISOString()).toBe("2026-09-02T11:15:00.000Z");
+    });
+});
+
+describe("isLateCheckIn", () => {
+    // Nepal 09:00 = 03:15Z; grace is 30 minutes so 09:30 = 03:45Z is the cutoff.
+    it("is on time up to and including the grace cutoff", () => {
+        expect(isLateCheckIn(new Date("2026-09-02T03:15:00Z"))).toBe(false);
+        expect(isLateCheckIn(new Date("2026-09-02T03:45:00Z"))).toBe(false);
+    });
+    it("is late after the grace cutoff", () => {
+        expect(isLateCheckIn(new Date("2026-09-02T03:46:00Z"))).toBe(true);
+    });
+});
+
+describe("computeAttendanceMetrics", () => {
+    const key = "2026-09-02"; // Nepal 09:00 = 03:15Z, 17:00 = 11:15Z
+    it("credits a full shift as 8 hours / Full Day", () => {
+        const m = computeAttendanceMetrics(
+            new Date("2026-09-02T03:15:00Z"),
+            new Date("2026-09-02T11:15:00Z"),
+            key
+        );
+        expect(m).toEqual({ workingHours: 8, overtimeHours: 0, dayType: "Full Day" });
+    });
+    it("downgrades a late arrival inside the shift window", () => {
+        const m = computeAttendanceMetrics(
+            new Date("2026-09-02T03:45:00Z"), // 09:30 -> 7.5 credited hours
+            new Date("2026-09-02T11:15:00Z"),
+            key
+        );
+        expect(m.workingHours).toBe(7.5);
+        expect(m.dayType).toBe("Three Quarter Day");
+    });
+    it("ignores presence outside the shift but counts evening overtime", () => {
+        const m = computeAttendanceMetrics(
+            new Date("2026-09-02T02:15:00Z"), // 08:00, before shift
+            new Date("2026-09-02T13:15:00Z"), // 19:00, two hours overtime
+            key
+        );
+        expect(m).toEqual({ workingHours: 8, overtimeHours: 2, dayType: "Full Day" });
+    });
+    it("returns a Short Day for under four credited hours", () => {
+        const m = computeAttendanceMetrics(
+            new Date("2026-09-02T03:15:00Z"),
+            new Date("2026-09-02T05:15:00Z"), // 09:00-11:00
+            key
+        );
+        expect(m.workingHours).toBe(2);
+        expect(m.dayType).toBe("Short Day");
     });
 });

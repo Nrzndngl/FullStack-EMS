@@ -5,6 +5,15 @@
 const TZ = "Asia/Kathmandu";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// Office shift (Asia/Kathmandu wall-clock). Credited working time is the
+// overlap of actual presence with this window; presence before the start or
+// after the end is not credited toward the day type. Overtime is presence
+// after the shift end.
+export const OFFICE_SHIFT_START = "09:00";
+export const OFFICE_SHIFT_END = "17:00";
+export const STANDARD_HOURS = 8;
+export const LATE_GRACE_MINUTES = 30;
+
 const keyFmt = new Intl.DateTimeFormat("en-CA", {
     timeZone: TZ,
     year: "numeric",
@@ -69,6 +78,43 @@ export function monthRangeForYearMonth(year, month) {
 /** True if the given Date falls on a Nepal wall-clock date strictly after today. */
 export function isFutureInNepal(date) {
     return nepalDateKey(date) > nepalDateKey();
+}
+
+/** Instant of a Nepal wall-clock "HH:MM" on a "YYYY-MM-DD" Nepal date key. */
+export function nepalInstant(dateKey, hhmm) {
+    return new Date(`${dateKey}T${hhmm}:00+05:45`);
+}
+
+/** True when a check-in instant is after the on-time cutoff (shift start + grace). */
+export function isLateCheckIn(checkIn, dateKey = nepalDateKey(checkIn)) {
+    const cutoff = nepalInstant(dateKey, OFFICE_SHIFT_START).getTime()
+        + LATE_GRACE_MINUTES * 60 * 1000;
+    return new Date(checkIn).getTime() > cutoff;
+}
+
+/**
+ * Credited hours (overlap with the office shift), overtime (presence after the
+ * shift end) and the resulting day type for a completed attendance record.
+ * `dateKey` is the Nepal calendar date ("YYYY-MM-DD") the record belongs to.
+ */
+export function computeAttendanceMetrics(checkIn, checkOut, dateKey) {
+    const shiftStart = nepalInstant(dateKey, OFFICE_SHIFT_START).getTime();
+    const shiftEnd = nepalInstant(dateKey, OFFICE_SHIFT_END).getTime();
+    const inTs = new Date(checkIn).getTime();
+    const outTs = new Date(checkOut).getTime();
+
+    const creditedMs = Math.max(0, Math.min(outTs, shiftEnd) - Math.max(inTs, shiftStart));
+    const overtimeMs = Math.max(0, outTs - Math.max(inTs, shiftEnd));
+
+    const workingHours = parseFloat((creditedMs / (60 * 60 * 1000)).toFixed(2));
+    const overtimeHours = parseFloat((overtimeMs / (60 * 60 * 1000)).toFixed(2));
+
+    let dayType = "Short Day";
+    if (workingHours >= STANDARD_HOURS) dayType = "Full Day";
+    else if (workingHours >= 6) dayType = "Three Quarter Day";
+    else if (workingHours >= 4) dayType = "Half Day";
+
+    return { workingHours, overtimeHours, dayType };
 }
 
 /** Inclusive number of Nepal days between two "YYYY-MM-DD" keys (end must be >= start). */
