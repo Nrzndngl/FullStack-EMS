@@ -78,16 +78,13 @@ export const createCorrectionRequest = async (req, res) => {
             return res.status(400).json({ error: "You already have a pending correction request for this date" });
         }
 
-        // If a regular attendance record already exists, canonical corrections go through the admin flow
+        // A correction request is still valid when a record already exists (e.g.
+        // a forgotten clock-out). The admin review flow updates that record in
+        // place, so blocking here would hide these cases from the admin entirely.
         const existingAttendance = await Attendance.findOne({
             employeeId: employee._id,
             date: { $gte: dayRangeForDateKey(dateKey).start, $lt: dayRangeForDateKey(dateKey).end },
-        });
-        if (existingAttendance) {
-            return res.status(400).json({
-                error: "You already have an attendance record for this date. Contact your admin to correct it.",
-            });
-        }
+        }).select("_id").lean();
 
         const request = await AttendanceCorrection.create({
             employeeId: employee._id,
@@ -105,7 +102,7 @@ export const createCorrectionRequest = async (req, res) => {
             notifyUser({
                 userId: adminId,
                 title: "New attendance correction request",
-                message: `${employeeName} requested a correction for ${dateKey}: ${reason.trim().slice(0, 80)}`,
+                message: `${employeeName} requested a correction for ${dateKey}${existingAttendance ? " (updates an existing record)" : ""}: ${reason.trim().slice(0, 80)}`,
                 type: "ATTENDANCE",
                 link: "/attendance",
                 entityId: request._id,
@@ -114,6 +111,7 @@ export const createCorrectionRequest = async (req, res) => {
 
         return res.json({ success: true, data: request });
     } catch (error) {
+        console.error("Create correction request failed:", error);
         return res.status(500).json({ error: "Failed to submit correction request" });
     }
 };
@@ -163,6 +161,29 @@ export const getAllCorrectionRequests = async (req, res) => {
             employee: r.employeeId,
             employeeId: r.employeeId?._id?.toString(),
         }));
+
+        // Attach the record that currently exists for each requested date so the
+        // admin can see what an approval would change (many requests are for
+        // days that already have a partial record, e.g. a missing clock-out).
+        const filters = data
+            .filter((r) => r.employeeId)
+            .map((r) => {
+                const { start, end } = dayRangeForDateKey(nepalDateKey(r.date));
+                return { employeeId: r.employeeId, date: { $gte: start, $lt: end } };
+            });
+        if (filters.length) {
+            const records = await Attendance.find({ $or: filters })
+                .select("employeeId date checkIn checkOut status workingHours overtimeHours dayType")
+                .lean();
+            const byKey = new Map(records.map((a) => [
+                `${a.employeeId}|${nepalDateKey(a.date)}`,
+                { ...a, id: a._id.toString(), employeeId: a.employeeId.toString() },
+            ]));
+            for (const row of data) {
+                row.currentRecord = byKey.get(`${row.employeeId}|${nepalDateKey(row.date)}`) || null;
+            }
+        }
+
         return res.json({ data, page, pageSize, total, totalPages: Math.ceil(total / pageSize) });
     } catch (error) {
         return res.status(500).json({ error: "Failed to fetch correction requests" });
