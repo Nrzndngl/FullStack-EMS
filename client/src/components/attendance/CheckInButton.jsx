@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { LogIn, LogOut, CheckCircle2, Clock } from "lucide-react";
+import { LogIn, LogOut, CheckCircle2, Clock, CalendarX2 } from "lucide-react";
 import api from "../../api/axios";
 import toast from "react-hot-toast";
 import Button from "../ui/Button";
-import { formatNepalTime } from "../../utils/format";
+import { formatNepalTime, isNepalWeekend } from "../../utils/format";
 
 const CheckInButton = ({ todayRecord, onAction }) => {
   const [loading, setLoading] = useState(false);
@@ -29,6 +29,22 @@ const CheckInButton = ({ todayRecord, onAction }) => {
       setLoading(false);
     }
   };
+
+  // Saturdays and Sundays are non-working days: no new clock-ins.
+  // Existing weekend records (created before this rule) can still be closed.
+  if (isNepalWeekend() && !todayRecord) {
+    return (
+      <div className="mb-7 card p-8 flex flex-col items-center justify-center text-center">
+        <div className="w-14 h-14 rounded-2xl bg-ink-100 text-ink-500 flex items-center justify-center mb-4">
+          <CalendarX2 className="w-7 h-7" />
+        </div>
+        <p className="text-lg font-semibold text-ink-900">Office closed today</p>
+        <p className="text-sm text-ink-500 mt-1">
+          Saturdays and Sundays are non-working days. Clock-in resumes on Monday.
+        </p>
+      </div>
+    );
+  }
 
   if (todayRecord?.checkOut) {
     return (

@@ -2,7 +2,7 @@ import { Inngest } from "inngest";
 import Attendance from "../models/Attendance.js";
 import Employee from "../models/Employee.js";
 import LeaveApplication from "../models/LeaveApplication.js";
-import { nepalDateKey, computeAttendanceMetrics } from "../utils/time.js";
+import { nepalDateKey, isNepalWeekend, computeAttendanceMetrics } from "../utils/time.js";
 import sendEmail from "../config/nodemailer.js";
 
 // Create a client to send and receive events
@@ -118,6 +118,12 @@ const leaveApplicationReminder = inngest.createFunction(
 const attendanceReminderCron = inngest.createFunction(
     { id: "attendance-application-reminder", triggers: [{ cron: "TZ=Asia/Kathmandu 30 11 * * *" }] },
     async ({ step }) => {
+        // The office is closed on Saturdays and Sundays, so nobody is expected
+        // to check in — skip the reminder emails entirely on weekends.
+        if (isNepalWeekend()) {
+            return { skipped: "weekend" };
+        }
+
         //get All Employee Data
         const today = await step.run("get-today-date", () => {
             const startUTC = nepalDayStart();

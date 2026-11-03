@@ -7,6 +7,7 @@ import {
     nepalDateKey,
     dayRangeForDateKey,
     isLateCheckIn,
+    isNepalWeekend,
     computeAttendanceMetrics,
 } from "../utils/time.js";
 import { recordAudit } from "../utils/audit.js";
@@ -43,6 +44,13 @@ export const clockInOut = async (req, res) => {
 
         // No record yet -> CHECK IN
         if (!existing) {
+            // The office is closed on Saturdays and Sundays (Nepal time).
+            // Block new clock-ins instead of recording weekend attendance.
+            if (isNepalWeekend()) {
+                return res.status(400).json({
+                    error: "The office is closed on Saturdays and Sundays. Clock-in is only allowed on working days.",
+                })
+            }
             // Nepal-aware late check (after office start + grace, Asia/Kathmandu)
             const isLate = isLateCheckIn(now);
             const attendance = await Attendance.create({
