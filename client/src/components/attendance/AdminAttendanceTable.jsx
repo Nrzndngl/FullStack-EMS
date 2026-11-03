@@ -393,7 +393,17 @@ const CorrectionsTab = () => {
                   return (
                     <tr key={r.id}>
                       <td className="font-medium text-ink-900">{name}</td>
-                      <td className="text-ink-600">{formatNepalDate(r.date)}</td>
+                      <td className="text-ink-600">
+                        <div>{formatNepalDate(r.date)}</div>
+                        {r.currentRecord && (
+                          <div
+                            className="text-[11px] text-ink-400"
+                            title="Attendance record that an approval will update"
+                          >
+                            existing: {r.currentRecord.checkIn ? formatNepalTime(r.currentRecord.checkIn) : "—"} → {r.currentRecord.checkOut ? formatNepalTime(r.currentRecord.checkOut) : "—"}
+                          </div>
+                        )}
+                      </td>
                       <td className="text-ink-600">{r.checkIn ? formatNepalTime(r.checkIn) : "—"}</td>
                       <td className="text-ink-600">{r.checkOut ? formatNepalTime(r.checkOut) : "—"}</td>
                       <td className="text-ink-600 max-w-[220px]">
