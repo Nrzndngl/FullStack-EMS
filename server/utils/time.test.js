@@ -8,6 +8,8 @@ import {
     isFutureInNepal,
     nepalInstant,
     isLateCheckIn,
+    nepalWeekday,
+    isNepalWeekend,
     computeAttendanceMetrics,
 } from "./time.js";
 
@@ -71,6 +73,27 @@ describe("nepalInstant", () => {
     it("maps a Nepal wall-clock time to the correct UTC instant", () => {
         expect(nepalInstant("2026-09-02", "09:00").toISOString()).toBe("2026-09-02T03:15:00.000Z");
         expect(nepalInstant("2026-09-02", "17:00").toISOString()).toBe("2026-09-02T11:15:00.000Z");
+    });
+});
+
+describe("nepalWeekday / isNepalWeekend", () => {
+    it("reports Saturday and Sunday as weekend in Nepal", () => {
+        // 2026-09-05 is a Saturday, 2026-09-06 a Sunday.
+        expect(nepalWeekday(new Date("2026-09-05T06:00:00Z"))).toBe(6);
+        expect(nepalWeekday(new Date("2026-09-06T06:00:00Z"))).toBe(0);
+        expect(isNepalWeekend(new Date("2026-09-05T06:00:00Z"))).toBe(true);
+        expect(isNepalWeekend(new Date("2026-09-06T06:00:00Z"))).toBe(true);
+    });
+    it("reports weekdays as working days", () => {
+        // 2026-09-02 is a Wednesday.
+        expect(nepalWeekday(new Date("2026-09-02T06:00:00Z"))).toBe(3);
+        expect(isNepalWeekend(new Date("2026-09-02T06:00:00Z"))).toBe(false);
+    });
+    it("uses the Nepal calendar date, not UTC", () => {
+        // Friday 23:30 UTC is already Saturday 05:15 in Kathmandu.
+        expect(isNepalWeekend(new Date("2026-09-04T23:30:00Z"))).toBe(true);
+        // Sunday 20:00 UTC is already Monday 01:45 in Kathmandu.
+        expect(isNepalWeekend(new Date("2026-09-06T20:00:00Z"))).toBe(false);
     });
 });
 

@@ -47,6 +47,19 @@ export function todayNepalKey() {
   return nepalDateKey(new Date());
 }
 
+/** Weekday (0 = Sunday ... 6 = Saturday) for the Nepal calendar date. */
+export function nepalWeekday(value = new Date()) {
+  const parts = nepalYMD(value);
+  if (!parts) return -1;
+  return new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay();
+}
+
+/** True when the Nepal calendar date is a weekend (Saturday or Sunday). */
+export function isNepalWeekend(value = new Date()) {
+  const day = nepalWeekday(value);
+  return day === 0 || day === 6;
+}
+
 export function dateFromNepalKey(key) {
   if (!key) return null;
   const date = new Date(`${key}T00:00:00+05:45`);

@@ -80,6 +80,20 @@ export function isFutureInNepal(date) {
     return nepalDateKey(date) > nepalDateKey();
 }
 
+/** Weekday (0 = Sunday ... 6 = Saturday) for the Nepal calendar date of `date`. */
+export function nepalWeekday(date = new Date()) {
+    return new Date(`${nepalDateKey(date)}T00:00:00Z`).getUTCDay();
+}
+
+/**
+ * True when the Nepal calendar date is a weekend (Saturday or Sunday).
+ * The office is closed on these days, so clock-in is not allowed.
+ */
+export function isNepalWeekend(date = new Date()) {
+    const day = nepalWeekday(date);
+    return day === 0 || day === 6;
+}
+
 /** Instant of a Nepal wall-clock "HH:MM" on a "YYYY-MM-DD" Nepal date key. */
 export function nepalInstant(dateKey, hhmm) {
     return new Date(`${dateKey}T${hhmm}:00+05:45`);
